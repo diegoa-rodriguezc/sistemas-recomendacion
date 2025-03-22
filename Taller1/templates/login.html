@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Recomendación de Películas</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/css/bootstrap.min.css">
+    <style>
+        body {
+            padding-top: 2rem;
+        }
+        .container {
+            max-width: 960px;
+        }
+
+        /* Esto elimina los controles de flecha en navegadores como Chrome */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            appearance: none;
+            margin: 0;
+        }
+
+        /* Para Firefox */
+        input[type="number"] {
+            appearance: textfield;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-4">Sistema de Recomendación de Películas</h1>
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Iniciar sesión</h3>
+                    </div>
+                    <div class="card-body">
+                        <form action="/login" method="post">
+                            <div class="mb-3">
+                                <label for="userId" class="form-label">ID de Usuario:</label>
+                                <input type="number" class="form-control" id="userId" name="userId" required min="1" step="1" oninput="this.value=this.value.replace(/[^0-9]/g,'')" />
+                                <div class="form-text">Ingrese un ID de usuario existente o registrese para crear un perfil.</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Ingresar</button>
+                            <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#newUserModal">
+                                Registrar
+                            </button>
+                        </form>
+                        {% if error %}
+                            <div class="alert alert-danger mt-3">{{ error }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Registro de Usuario Nuevo -->
+    <div class="modal fade" id="newUserModal" tabindex="-1" aria-labelledby="newUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newUserModalLabel">Registrar Nuevo Usuario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="newUserForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Nombre de Usuario:</label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5>Califica algunas películas para recibir recomendaciones personalizadas:</h5>
+                            <p class="text-muted">Califique al menos 5 películas para continuar (0.5-5.0 estrellas)</p>
+                            <div id="popularMoviesContainer" class="row">
+                                <div class="text-center">
+                                    <div class="spinner-border" role="status">
+                                        <span class="visually-hidden">Cargando...</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="registerButton" disabled>Registrar Usuario</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Variables globales
+        let popularMovies = [];
+        let userRatings = [];
+        const minRatingsRequired = 5;
+        
+        // Cuando se abre el modal, cargar películas populares
+        document.getElementById('newUserModal').addEventListener('show.bs.modal', function () {
+            fetchPopularMovies();
+        });
+        
+        // Función para obtener películas populares
+        async function fetchPopularMovies() {
+            try {
+                const response = await fetch('/popular-movies');
+                if (!response.ok) {
+                    throw new Error('Error al cargar películas populares');
+                }
+                
+                popularMovies = await response.json();
+                renderPopularMovies();
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('popularMoviesContainer').innerHTML = 
+                    `<div class="alert alert-danger">Error al cargar películas: ${error.message}</div>`;
+            }
+        }
+        
+        // Función para renderizar las películas populares
+        function renderPopularMovies() {
+            const container = document.getElementById('popularMoviesContainer');
+            container.innerHTML = '';
+            
+            popularMovies.forEach(movie => {
+                const col = document.createElement('div');
+                col.className = 'col-md-6 mb-3';
+                
+                col.innerHTML = `
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">${movie.title}</h5>
+                            <p class="card-text">
+                                <small class="text-muted">${movie.genres}</small>
+                            </p>
+                            <div class="text-center mb-2">
+                                <div class="rating-display" id="rating-display-${movie.movieId}">Sin calificación</div>
+                            </div>
+                            <div class="d-flex align-items-center justify-content-center">
+                                <input type="range" class="form-range me-2" min="0" max="10" step="1" value="0" 
+                                       id="rating-slider-${movie.movieId}" data-movie-id="${movie.movieId}">
+                                <button class="btn btn-sm btn-outline-danger rating-clear-btn" 
+                                        data-movie-id="${movie.movieId}" style="display:none;">
+                                    <span aria-hidden="true">&times;</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(col);
+            });
+            
+            // Añadir event listeners a los sliders
+            const sliders = document.querySelectorAll('input[type="range"]');
+            sliders.forEach(slider => {
+                slider.addEventListener('input', handleRatingSlider);
+                slider.addEventListener('change', updateRating);
+            });
+            
+            // Añadir event listeners a los botones de limpiar
+            const clearButtons = document.querySelectorAll('.rating-clear-btn');
+            clearButtons.forEach(btn => {
+                btn.addEventListener('click', clearRating);
+            });
+        }
+        
+        // Función para manejar el movimiento del slider
+        function handleRatingSlider(e) {
+            const slider = e.target;
+            const value = slider.value;
+            const movieId = parseInt(slider.getAttribute('data-movie-id'));
+            const ratingValue = value > 0 ? value / 2 : 0;
+            
+            // Actualizar el texto de visualización
+            const displayElement = document.getElementById(`rating-display-${movieId}`);
+            if (ratingValue === 0) {
+                displayElement.textContent = 'Sin calificación';
+            } else {
+                displayElement.textContent = `${ratingValue.toFixed(1)} ⭐`;
+            }
+            
+            // Mostrar el botón de limpiar si hay una calificación
+            const clearButton = document.querySelector(`.rating-clear-btn[data-movie-id="${movieId}"]`);
+            if (ratingValue > 0) {
+                clearButton.style.display = 'block';
+            } else {
+                clearButton.style.display = 'none';
+            }
+        }
+        
+        // Función para actualizar la calificación al soltar el slider
+        function updateRating(e) {
+            const slider = e.target;
+            const value = parseInt(slider.value);
+            const movieId = parseInt(slider.getAttribute('data-movie-id'));
+            const ratingValue = value > 0 ? value / 2 : 0;
+            
+            if (ratingValue > 0) {
+                // Actualizar el array de calificaciones
+                const existingIndex = userRatings.findIndex(r => Object.hasOwnProperty.call(r, movieId));
+                if (existingIndex !== -1) {
+                    // Actualizar calificación existente
+                    userRatings[existingIndex] = { [movieId]: ratingValue };
+                } else {
+                    // Agregar nueva calificación
+                    userRatings.push({ [movieId]: ratingValue });
+                }
+            } else {
+                // Eliminar la calificación si es 0
+                userRatings = userRatings.filter(r => !Object.hasOwnProperty.call(r, movieId));
+            }
+            
+            // Verificar si hay suficientes calificaciones para habilitar el botón de registro
+            updateRegisterButton();
+        }
+        
+        // Función para limpiar una calificación
+        function clearRating(e) {
+            const movieId = parseInt(e.target.getAttribute('data-movie-id') || 
+                                    e.target.parentElement.getAttribute('data-movie-id'));
+            
+            // Resetear el slider
+            const slider = document.getElementById(`rating-slider-${movieId}`);
+            slider.value = 0;
+            
+            // Actualizar el texto de visualización
+            const displayElement = document.getElementById(`rating-display-${movieId}`);
+            displayElement.textContent = 'Sin calificación';
+            
+            // Ocultar el botón de limpiar
+            e.target.closest('.rating-clear-btn').style.display = 'none';
+            
+            // Eliminar del array de calificaciones
+            userRatings = userRatings.filter(r => !Object.hasOwnProperty.call(r, movieId));
+            
+            // Verificar el botón de registro
+            updateRegisterButton();
+        }
+        
+        // Función para actualizar el estado del botón de registro
+        function updateRegisterButton() {
+            const registerButton = document.getElementById('registerButton');
+            registerButton.disabled = userRatings.length < minRatingsRequired;
+            
+            // Opcional: mostrar contador de calificaciones
+            const countText = `Registrar Usuario (${userRatings.length}/${minRatingsRequired} calificaciones)`;
+            registerButton.textContent = countText;
+        }
+        
+        // Event listener para el botón de registro
+        document.getElementById('registerButton').addEventListener('click', async function() {
+            const username = document.getElementById('username').value.trim();
+            
+            if (!username) {
+                alert('Por favor, ingrese un nombre de usuario');
+                return;
+            }
+            
+            if (userRatings.length < minRatingsRequired) {
+                alert(`Por favor, califique al menos ${minRatingsRequired} películas`);
+                return;
+            }
+            
+            try {
+                // Mostrar indicador de carga
+                this.disabled = true;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Registrando...';
+                
+                // Enviar datos al servidor
+                const response = await fetch('/users/new', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: username,
+                        ratings: userRatings
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Error al registrar usuario');
+                }
+                
+                const data = await response.json();
+                
+                // Redirigir a la página principal
+                window.location.href = `/index?userId=${data.userId}`;
+                
+            } catch (error) {
+                console.error('Error:', error);
+                alert(`Error al registrar: ${error.message}`);
+                
+                // Restaurar botón
+                this.disabled = false;
+                updateRegisterButton();
+            }
+        });
+
+        // Acciones del botón cancelar 
+        document.querySelector('.btn-secondary[data-bs-dismiss="modal"]').addEventListener('click', function () {
+            // Limpiar el campo de nombre de usuario
+            document.getElementById('username').value = '';
+
+            // Limpiar las calificaciones
+            userRatings = [];
+            
+            // Resetear las calificaciones visualmente (por cada película)
+            const ratingDisplays = document.querySelectorAll('.rating-display');
+            ratingDisplays.forEach(display => {
+                display.textContent = 'Sin calificación';
+            });
+
+            // Resetear los sliders (por cada película)
+            const sliders = document.querySelectorAll('input[type="range"]');
+            sliders.forEach(slider => {
+                slider.value = 0;
+            });
+
+            // Ocultar los botones de limpiar
+            const clearButtons = document.querySelectorAll('.rating-clear-btn');
+            clearButtons.forEach(btn => {
+                btn.style.display = 'none';
+            });
+
+            // Restaurar el botón de registro (habilitar y actualizar contador)
+            updateRegisterButton();
+        });
+
+    </script>
+</body>
+</html>

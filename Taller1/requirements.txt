@@ -1,0 +1,12 @@
+fastapi
+joblib
+markdown
+pandas
+psycopg2
+pyodbc
+python-multipart
+sqlalchemy
+uvicorn
+numpy<2.0
+jinja2
+scikit-surprise

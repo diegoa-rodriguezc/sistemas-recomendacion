@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Recomendación de Películas</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .movie-card {
+            margin-bottom: 20px;
+            transition: transform 0.3s;
+        }
+        .movie-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .rating-star {
+            color: gold;
+            font-size: 24px;
+        }
+        .explanation-card {
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        .neighbor-item {
+            border-bottom: 1px solid #eee;
+            padding: 5px 0;
+        }
+        .similarity-score {
+            font-weight: bold;
+            color: #007bff;
+        }
+        .user-rating {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background-color: #28a745;
+            color: white;
+            text-align: center;
+            line-height: 30px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .filter-checkbox {
+            margin-right: 10px;
+        }
+        .filter-container {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #e9ecef;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+        }
+        .filter-label {
+            margin-right: 15px;
+            font-weight: 500;
+        }
+    </style>
+    <script>
+        document.addEventListener("DOMContentLoaded", async function () {
+            // Obtener el userId de la URL
+            const params = new URLSearchParams(window.location.search);
+            const userId = params.get("userId");
+
+            if (userId) {
+                await loadUsers(); // Cargar la lista de usuarios
+                currentUserId = parseInt(userId);
+                document.getElementById("userSelect").value = userId; // Seleccionar usuario en el dropdown
+                triggerUserSelection(userId); // Ejecutar funciones del usuario
+            }
+            
+            // Set up filter listeners once at page load
+            setupFilterListeners();
+        });
+
+        function setupFilterListeners() {
+            const userCheckboxes = document.querySelectorAll('.user-filter-checkbox');
+            userCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    handleFilterSelection('user-filter-checkbox', 'user-based');
+                });
+            });
+
+            const itemCheckboxes = document.querySelectorAll('.item-filter-checkbox');
+            itemCheckboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', function() {
+                    handleFilterSelection('item-filter-checkbox', 'item-based');
+                });
+            });
+        }
+
+        // ✅ Agregar un mensaje de "Verificando recomendaciones..."
+        function showLoadingMessage(type) {
+            const recommendationsDiv = document.getElementById(
+                type === "user-based" ? "userBasedRecommendations" : "itemBasedRecommendations"
+            );
+
+            recommendationsDiv.innerHTML = `<p class="text-center text-muted">🔍 Verificando recomendaciones...</p>`;
+        }
+
+        function getSelectedFilters(className) {
+            const checkboxes = document.querySelectorAll(`.${className}:checked`);
+            const values = Array.from(checkboxes).map(cb => cb.value);
+            
+            // Si está seleccionado "all", simplemente devolvemos "all"
+            if (values.includes('all')) {
+                return ['all'];
+            }
+            
+            // Si no hay selecciones, devolvemos "all" por defecto
+            if (values.length === 0) {
+                return ['all'];
+            }
+            
+            return values;
+        }
+
+        function triggerUserSelection(userId) {
+            if (!userId) return;
+
+            loadUserRatings(userId); // Cargar ratings del usuario
+            
+            // Por defecto, seleccionar "Todas" en ambos filtros
+            document.querySelector('.user-filter-checkbox[value="all"]').checked = true;
+            document.querySelector('.item-filter-checkbox[value="all"]').checked = true;
+            
+            // Deshabilitar las opciones individuales
+            document.querySelectorAll('.user-filter-checkbox:not([value="all"])').forEach(cb => {
+                cb.checked = false;
+                cb.disabled = true;
+            });
+            
+            document.querySelectorAll('.item-filter-checkbox:not([value="all"])').forEach(cb => {
+                cb.checked = false;
+                cb.disabled = true;
+            });
+            
+            loadRecommendations(userId, ['all'], "user-based"); // Cargar recomendaciones user-user
+            loadRecommendations(userId, ['all'], "item-based"); // Cargar recomendaciones item-item
+        }
+
+        // Variables para almacenar el estado de paginación
+        let paginationState = {
+            "user-based": { offset: 0, limit: 9, hasMore: true, isLoading: false },
+            "item-based": { offset: 0, limit: 9, hasMore: true, isLoading: false }
+        };
+
+        // Función para reiniciar estado de paginación
+        function resetPagination(type) {
+            paginationState[type] = { offset: 0, limit: 9, hasMore: true, isLoading: false };
+            // Limpiar el contenedor de recomendaciones
+            const recommendationsDiv = document.getElementById(
+                type === "user-based" ? "userBasedRecommendations" : "itemBasedRecommendations"
+            );
+            recommendationsDiv.innerHTML = "";
+        }
+
+        async function loadRecommendations(userId, filters, type, loadMore = false) {
+            if (!userId) return;
+            
+            // Si no es cargar más, resetear paginación
+            if (!loadMore) {
+                resetPagination(type);
+            }
+            
+            // Si está cargando o no hay más elementos, salir
+            if (paginationState[type].isLoading || (!loadMore && !paginationState[type].hasMore)) {
+                return;
+            }
+            
+            // Establecer estado de carga
+            paginationState[type].isLoading = true;
+            
+            // Preparar los parámetros de la consulta
+            let queryParams = new URLSearchParams();
+            
+            // Añadir parámetros de paginación
+            queryParams.append('limit', paginationState[type].limit);
+            queryParams.append('offset', paginationState[type].offset);
+            
+            // Si no es 'all', añadir los valores como parámetro
+            if (!filters.includes('all')) {
+                queryParams.append('filter_ratings', filters.join(','));
+            }
+            
+            // Usar la ruta correcta según el tipo de recomendación
+            const baseEndpoint = type === "user-based" 
+                ? `/user/${userId}/recommendations/user-based` 
+                : `/user/${userId}/recommendations/item-based`;
+            
+            // Añadir los parámetros de consulta a la URL
+            const endpoint = `${baseEndpoint}?${queryParams.toString()}`;
+            
+            // Si es la primera carga, mostrar mensaje de carga
+            if (!loadMore) {
+                showLoadingMessage(type);
+            } else {
+                // Si es cargar más, mostrar indicador al final de la lista
+                const recommendationsDiv = document.getElementById(
+                    type === "user-based" ? "userBasedRecommendations" : "itemBasedRecommendations"
+                );
+                
+                // Crear y añadir el indicador de carga
+                const loadingIndicator = document.createElement('div');
+                loadingIndicator.id = `${type}-loading-indicator`;
+                loadingIndicator.className = 'col-12 text-center my-3';
+                loadingIndicator.innerHTML = '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Cargando...</span></div>';
+                recommendationsDiv.appendChild(loadingIndicator);
+            }
+            
+            try {
+                const response = await fetch(endpoint);
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log(`Received ${data.items.length} recommendations for ${type} (total: ${data.total})`);
+                
+                const recommendationsDiv = document.getElementById(
+                    type === "user-based" ? "userBasedRecommendations" : "itemBasedRecommendations"
+                );
+                
+                // Eliminar indicador de carga si existe
+                const loadingIndicator = document.getElementById(`${type}-loading-indicator`);
+                if (loadingIndicator) {
+                    loadingIndicator.remove();
+                }
+                
+                // Si es la primera carga, limpiar el contenedor
+                if (!loadMore) {
+                    recommendationsDiv.innerHTML = "";
+                    
+                    // Crear un contenedor para las tarjetas de películas
+                    const movieCardsContainer = document.createElement('div');
+                    movieCardsContainer.id = `${type}-movie-cards`;
+                    movieCardsContainer.className = 'row';
+                    recommendationsDiv.appendChild(movieCardsContainer);
+                }
+                
+                // Obtener el contenedor de tarjetas
+                const movieCardsContainer = document.getElementById(`${type}-movie-cards`);
+                
+                if (data.items.length === 0 && !loadMore) {
+                    recommendationsDiv.innerHTML = "<p class='col-12 text-center'>No hay recomendaciones disponibles para este filtro</p>";
+                    paginationState[type].hasMore = false;
+                } else {
+                    // Crear elementos para cada recomendación
+                    data.items.forEach(rec => {
+                        const movieCard = document.createElement('div');
+                        movieCard.className = 'col-md-4 movie-card';
+                        movieCard.innerHTML = `
+                            <div class="card mb-3">
+                                <div class="card-body">
+                                    <h6 class="card-title">${rec.title}</h6>
+                                    <p class="card-text"><small class="text-muted">${rec.genres}</small></p>
+                                    <p class="card-text">
+                                        <span class="rating-star">⭐</span> 
+                                        <span class="fw-bold">${rec.predicted_rating.toFixed(1)}</span>
+                                    </p>
+                                </div>
+                            </div>
+                        `;
+                        movieCardsContainer.appendChild(movieCard);
+                    });
+
+                    // Actualizar estado de paginación
+                    paginationState[type].offset += data.items.length;
+                    paginationState[type].hasMore = data.items.length > 0 && paginationState[type].offset < data.total;
+
+                    // Si hay más elementos, añadir botón "Cargar más"
+                    if (paginationState[type].hasMore) {
+                        // Asegurarnos de que el botón se añade directamente al contenedor principal, no al de las tarjetas
+                        addLoadMoreButton(recommendationsDiv, type, userId, filters);
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching recommendations:", error);
+                const recommendationsDiv = document.getElementById(
+                    type === "user-based" ? "userBasedRecommendations" : "itemBasedRecommendations"
+                );
+                
+                // Eliminar indicador de carga si existe
+                const loadingIndicator = document.getElementById(`${type}-loading-indicator`);
+                if (loadingIndicator) {
+                    loadingIndicator.remove();
+                }
+                
+                if (!loadMore) {
+                    recommendationsDiv.innerHTML = `<p class='col-12 text-center'>Error al cargar recomendaciones: ${error.message}</p>`;
+                } else {
+                    // Añadir mensaje de error sin borrar los elementos cargados previamente
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'col-12 text-center text-danger my-3';
+                    errorMsg.textContent = `Error al cargar más recomendaciones: ${error.message}`;
+                    recommendationsDiv.appendChild(errorMsg);
+                }
+            } finally {
+                paginationState[type].isLoading = false;
+            }
+        }
+
+        // Función para añadir botón "Cargar más"
+        function addLoadMoreButton(container, type, userId, filters) {
+            // Eliminar botón anterior si existe
+            const existingButton = document.getElementById(`${type}-load-more-btn-container`);
+            if (existingButton) {
+                existingButton.remove();
+            }
+            
+            // Crear un div contenedor de ancho completo para el botón
+            const loadMoreContainer = document.createElement('div');
+            loadMoreContainer.id = `${type}-load-more-btn-container`;
+            loadMoreContainer.className = 'w-100 text-center my-3';
+            
+            const loadMoreBtn = document.createElement('button');
+            loadMoreBtn.id = `${type}-load-more-btn`;
+            loadMoreBtn.className = 'btn btn-outline-primary';
+            loadMoreBtn.textContent = 'Cargar más recomendaciones';
+            loadMoreBtn.addEventListener('click', () => loadRecommendations(userId, filters, type, true));
+            
+            loadMoreContainer.appendChild(loadMoreBtn);
+            
+            // Asegurar que el botón se añade después del contenedor de tarjetas
+            container.appendChild(loadMoreContainer);
+        }
+        
+        function handleFilterSelection(className, type) {
+            const userId = document.getElementById("userSelect").value;
+            if (!userId) return;
+
+            const checkboxes = document.querySelectorAll(`.${className}`);
+            const allCheckbox = document.querySelector(`.${className}[value="all"]`);
+
+            let selectedFilters = [];
+
+            checkboxes.forEach(cb => {
+                if (cb.checked) {
+                    selectedFilters.push(cb.value);
+                }
+            });
+
+            // Si "Todas" está seleccionada, deshabilita las demás opciones y recarga
+            if (allCheckbox.checked) {
+                checkboxes.forEach(cb => {
+                    if (cb !== allCheckbox) {
+                        cb.checked = false;
+                        cb.disabled = true;
+                    }
+                });
+                showLoadingMessage(type);
+                resetPagination(type); // Reset paginación al cambiar filtros
+                loadRecommendations(userId, ["all"], type, false);
+                return;
+            }
+
+            // Si "Todas" es deseleccionada, habilita las demás opciones, pero NO recarga aún
+            if (!allCheckbox.checked && selectedFilters.length === 0) {
+                checkboxes.forEach(cb => {
+                    if (cb !== allCheckbox) {
+                        cb.disabled = false;
+                    }
+                });
+                return; // No recargar si no hay nada seleccionado
+            }
+
+            // Si se selecciona otra opción, "Todas" se desactiva y se recarga
+            if (selectedFilters.length > 0) {
+                allCheckbox.checked = false;
+                checkboxes.forEach(cb => {
+                    cb.disabled = false; // Asegurar que todas las opciones se mantengan habilitadas
+                });
+                showLoadingMessage(type);
+                resetPagination(type); // Reset paginación al cambiar filtros
+                loadRecommendations(userId, selectedFilters, type, false);
+            }
+        }
+    </script>
+</head>
+<body>
+    <div class="container my-5">
+        <header class="text-center mb-5">
+            <h1>Sistema de Recomendación de Películas</h1>
+            <p class="lead">Taller 1 - Modelos Colaborativos</p>
+            <a href="/logout" class="btn btn-danger">Cerrar Sesión</a>
+        </header>
+
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Usuario</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="userSelect" class="form-label"></label>
+                            <select class="form-select" id="userSelect" disabled>
+                                <option value="">Seleccionar usuario...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-4" id="userRatingsCard" style="display: none;">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Películas Calificadas</h5>
+                        <button class="btn btn-sm btn-primary" id="addRatingBtn" data-bs-toggle="modal" data-bs-target="#rateMovieModal">
+                            Calificar Nueva Película
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="userRatingsList" class="list-group">
+                            <!-- Las películas calificadas se mostrarán aquí -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-8">
+                <ul class="nav nav-tabs" id="recommendationTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="user-based-tab" data-bs-toggle="tab" data-bs-target="#user-based-content" type="button" role="tab">
+                            Recomendaciones Usuario-Usuario
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="item-based-tab" data-bs-toggle="tab" data-bs-target="#item-based-content" type="button" role="tab">
+                            Recomendaciones Ítem-Ítem
+                        </button>
+                    </li>
+                </ul>
+
+                <!-- Modificar las secciones de recomendaciones para soportar paginación -->
+                <div class="tab-content p-3 border border-top-0 rounded-bottom" id="recommendationTabsContent">
+                    <div class="tab-pane fade show active" id="user-based-content" role="tabpanel">
+                        <div class="filter-container">
+                            <h6 class="mb-3">Filtrar por calificación:</h6>
+                            <div class="d-flex flex-wrap">
+                                <div class="form-check me-3">
+                                    <input class="form-check-input user-filter-checkbox" type="checkbox" value="all" id="userFilterAll" checked>
+                                    <label class="form-check-label" for="userFilterAll">Todas</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input user-filter-checkbox" type="checkbox" value="0" id="userFilter0" disabled>
+                                    <label class="form-check-label" for="userFilter0">0 ⭐</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input user-filter-checkbox" type="checkbox" value="1" id="userFilter1" disabled>
+                                    <label class="form-check-label" for="userFilter1">1 ⭐</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input user-filter-checkbox" type="checkbox" value="2" id="userFilter2" disabled>
+                                    <label class="form-check-label" for="userFilter2">2 ⭐</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input user-filter-checkbox" type="checkbox" value="3" id="userFilter3" disabled>
+                                    <label class="form-check-label" for="userFilter3">3 ⭐</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input user-filter-checkbox" type="checkbox" value="4" id="userFilter4" disabled>
+                                    <label class="form-check-label" for="userFilter4">4 ⭐</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input user-filter-checkbox" type="checkbox" value="5" id="userFilter5" disabled>
+                                    <label class="form-check-label" for="userFilter5">5 ⭐</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="userBasedRecommendations" >
+                            <p class="col-12 text-center">🔍 Verificando recomendaciones...</p>
+                        </div>
+                        <!-- El botón "Cargar más" se insertará aquí dinámicamente -->
+                    </div>
+                    <div class="tab-pane fade" id="item-based-content" role="tabpanel">
+                        <div class="filter-container">
+                            <h6 class="mb-3">Filtrar por calificación:</h6>
+                            <div class="d-flex flex-wrap">
+                                <div class="form-check me-3">
+                                    <input class="form-check-input item-filter-checkbox" type="checkbox" value="all" id="itemFilterAll" checked>
+                                    <label class="form-check-label" for="itemFilterAll">Todas</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input item-filter-checkbox" type="checkbox" value="0" id="itemFilter0" disabled>
+                                    <label class="form-check-label" for="itemFilter0">0 ⭐</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input item-filter-checkbox" type="checkbox" value="1" id="itemFilter1" disabled>
+                                    <label class="form-check-label" for="itemFilter1">1 ⭐</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input item-filter-checkbox" type="checkbox" value="2" id="itemFilter2" disabled>
+                                    <label class="form-check-label" for="itemFilter2">2 ⭐</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input item-filter-checkbox" type="checkbox" value="3" id="itemFilter3" disabled>
+                                    <label class="form-check-label" for="itemFilter3">3 ⭐</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input item-filter-checkbox" type="checkbox" value="4" id="itemFilter4" disabled>
+                                    <label class="form-check-label" for="itemFilter4">4 ⭐</label>
+                                </div>
+                                <div class="form-check me-3">
+                                    <input class="form-check-input item-filter-checkbox" type="checkbox" value="5" id="itemFilter5" disabled>
+                                    <label class="form-check-label" for="itemFilter5">5 ⭐</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="itemBasedRecommendations" >
+                            <p class="col-12 text-center">🔍 Verificando recomendaciones...</p>
+                        </div>
+                        <!-- El botón "Cargar más" se insertará aquí dinámicamente -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para nuevo usuario -->
+    <div class="modal fade" id="newUserModal" tabindex="-1" aria-labelledby="newUserModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="newUserModalLabel">Crear Nuevo Usuario</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="newUsername" class="form-label">Nombre de Usuario</label>
+                        <input type="text" class="form-control" id="newUsername" required>
+                    </div>
+                    <div class="mb-3">
+                        <h6>Califica algunas películas para empezar:</h6>
+                        <p>Esto nos ayudará a generar mejores recomendaciones para ti.</p>
+                        <div id="popularMoviesList" class="row">
+                            <!-- Películas populares para calificar -->
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="createUserBtn">Crear Usuario</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para calificar película -->
+    <div class="modal fade" id="rateMovieModal" tabindex="-1" aria-labelledby="rateMovieModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="rateMovieModalLabel">Calificar Nueva Película</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="movieSelect" class="form-label">Seleccionar Película</label>
+                        <select class="form-select" id="movieSelect">
+                            <option value="">Seleccionar película...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tu Calificación</label>
+                        <div class="rating-input">
+                            <div class="btn-group w-100">
+                                <button type="button" class="btn btn-outline-warning rating-btn" data-value="0.5">0.5</button>
+                                <button type="button" class="btn btn-outline-warning rating-btn" data-value="1.0">1.0</button>
+                                <button type="button" class="btn btn-outline-warning rating-btn" data-value="1.5">1.5</button>
+                                <button type="button" class="btn btn-outline-warning rating-btn" data-value="2.0">2.0</button>
+                                <button type="button" class="btn btn-outline-warning rating-btn" data-value="2.5">2.5</button>
+                                <button type="button" class="btn btn-outline-warning rating-btn" data-value="3.0">3.0</button>
+                                <button type="button" class="btn btn-outline-warning rating-btn" data-value="3.5">3.5</button>
+                                <button type="button" class="btn btn-outline-warning rating-btn" data-value="4.0">4.0</button>
+                                <button type="button" class="btn btn-outline-warning rating-btn" data-value="4.5">4.5</button>
+                                <button type="button" class="btn btn-outline-warning rating-btn" data-value="5.0">5.0</button>
+                            </div>
+                            <input type="hidden" id="selectedRating" value="">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="submitRatingBtn">Guardar Calificación</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
