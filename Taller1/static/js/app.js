@@ -1,37 +1,7 @@
 // Variables globales
-let currentUserId = null;
 let allMovies = [];
 let userRatings = [];
 let newUserRatings = {};
-
-// Función para cargar la lista de usuarios
-async function loadUsers() {
-    try {
-        const response = await fetch('/users');
-        const users = await response.json();
-        
-        const userSelect = document.getElementById('userSelect');
-        userSelect.innerHTML = '<option value="">Seleccionar usuario...</option>';
-        
-        users.forEach(user => {
-            const option = document.createElement('option');
-            option.value = user.userId;
-            option.textContent = `${user.username} (ID: ${user.userId})`;
-            userSelect.appendChild(option);
-        });
-
-        // Si hay un usuario en la URL, seleccionarlo
-        const params = new URLSearchParams(window.location.search);
-        const userId = params.get("userId");
-        if (userId) {
-            userSelect.value = userId;
-        }
-        
-    } catch (error) {
-        console.error('Error cargando usuarios:', error);
-        alert('Error cargando la lista de usuarios');
-    }
-}
 
 // Función para cargar películas populares (para nuevos usuarios)
 async function loadPopularMovies() {
@@ -92,7 +62,7 @@ async function loadPopularMovies() {
 // Función para cargar todas las películas
 async function loadAllMovies() {
     try {
-        const response = await fetch('/movies?limit=1000');
+        const response = await fetch('/movies?limit=100&offset=100&order=asc');
         allMovies = await response.json();
         
         const movieSelect = document.getElementById('movieSelect');
@@ -127,18 +97,14 @@ async function loadUserRatings(userId) {
             const item = document.createElement('div');
             item.className = 'list-group-item d-flex justify-content-between align-items-center';
             
-            // Crear estrellas basadas en el rating
-            /*const stars = '★'.repeat(Math.floor(rating.rating)) + 
-                         (rating.rating % 1 >= 0.5 ? '½' : '');*/
-            const stars = '⭐' + 
-                         (rating.rating % 1 >= 0.5 ? '½' : '');
+            const stars = '⭐' + rating.rating ;
                          
             item.innerHTML = `
                 <div>
                     <h6 class="mb-0">${rating.title}</h6>
                     <small class="text-muted">${rating.genres}</small>
                 </div>
-                <span class="rating-star">${stars} <small>(${rating.rating})</small></span>
+                <span class="rating-star">${stars}</span>
             `;
             
             userRatingsList.appendChild(item);
@@ -171,10 +137,8 @@ async function loadUserBasedRecommendations(userId) {
             movieCard.className = 'col-md-6 col-lg-4 mb-4';
 
             // Crear estrellas basadas en el rating predicho
-            //.repeat(Math.floor(rec.predicted_rating)) + 
-            const stars = '⭐' + 
-                         (rec.predicted_rating % 1 >= 0.5 ? '½' : '');
-
+            const stars = '⭐' + rec.predicted_rating;
+            
             // Verificar si hay explicación disponible
             let explanationHtml = '<p>No hay información de explicación disponible</p>';
             if (rec.explanation && rec.explanation.relevant_neighbors) {
@@ -270,9 +234,7 @@ async function loadUserBasedRecommendations_version1(userId) {
             movieCard.className = 'col-md-6 col-lg-4 mb-4';
             
             // Crear estrellas basadas en el rating predicho
-            //.repeat(Math.floor(rec.predicted_rating)) + 
-            const stars = '⭐' + 
-                         (rec.predicted_rating % 1 >= 0.5 ? '½' : '');
+            const stars = '⭐' + rec.predicted_rating;
             
             // Preparar la explicación de la recomendación
             let explanationHtml = `
@@ -371,10 +333,8 @@ async function loadItemBasedRecommendations(userId) {
             movieCard.className = 'col-md-6 col-lg-4 mb-4';
 
             // Crear estrellas basadas en el rating predicho
-            //.repeat(Math.floor(rec.predicted_rating)) + 
-            const stars = '⭐' + 
-                         (rec.predicted_rating % 1 >= 0.5 ? '½' : '');
-
+            const stars = '⭐' + rec.predicted_rating;
+            
             // Verificar si hay explicación disponible
             let explanationHtml = '<p>No hay información de explicación disponible</p>';
             if (rec.explanation && rec.explanation.similar_items_rated_by_user) {
@@ -452,9 +412,7 @@ async function loadItemBasedRecommendations_version1(userId) {
             movieCard.className = 'col-md-6 col-lg-4 mb-4';
             
             // Crear estrellas basadas en el rating predicho
-            //.repeat(Math.floor(rec.predicted_rating)) + 
-            const stars = '⭐' + 
-                         (rec.predicted_rating % 1 >= 0.5 ? '½' : '');
+            const stars = '⭐' + rec.predicted_rating;
             
             // Preparar la explicación de la recomendación
             let explanationHtml = `
@@ -513,16 +471,6 @@ async function loadItemBasedRecommendations_version1(userId) {
     }
 }
 
-// Evento para seleccionar usuario
-document.getElementById('userSelect').addEventListener('change', async (e) => {
-    const userId = e.target.value;
-    if (!userId) return;
-    
-    currentUserId = parseInt(userId);
-    await loadUserRatings(userId);
-    await loadUserBasedRecommendations(userId);
-    await loadItemBasedRecommendations(userId);
-});
 
 // Evento para crear nuevo usuario
 document.getElementById('createUserBtn').addEventListener('click', async () => {
@@ -569,8 +517,6 @@ document.getElementById('createUserBtn').addEventListener('click', async () => {
             btn.classList.add('btn-outline-warning');
         });
 
-        // Recargar lista de usuarios y seleccionar el nuevo
-        await loadUsers();
         currentUserId = result.userId;
         document.getElementById('userSelect').value = result.userId;
 
@@ -586,71 +532,6 @@ document.getElementById('createUserBtn').addEventListener('click', async () => {
     }
 });
 
-/*
-document.getElementById('createUserBtn').addEventListener('click', async () => {
-    const username = document.getElementById('newUsername').value.trim();
-    
-    if (!username) {
-        alert('Por favor ingrese un nombre de usuario');
-        return;
-    }
-    
-    if (Object.keys(newUserRatings).length < 5) {
-        alert('Por favor califique al menos 5 películas para obtener mejores recomendaciones');
-        return;
-    }
-    
-    try {
-        // Preparar datos para enviar al servidor
-        const ratingsArray = [];
-        for (const movieId in newUserRatings) {
-            const ratingObj = {};
-            ratingObj[movieId] = newUserRatings[movieId];
-            ratingsArray.push(ratingObj);
-        }
-        
-        const response = await fetch('/users/new', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                username: username,
-                ratings: ratingsArray
-            })
-        });
-        
-        const result = await response.json();
-        
-        // Cerrar modal
-        const modal = bootstrap.Modal.getInstance(document.getElementById('newUserModal'));
-        modal.hide();
-        
-        // Limpiar datos de nuevo usuario
-        document.getElementById('newUsername').value = '';
-        newUserRatings = {};
-        document.querySelectorAll('.new-user-rating-btn').forEach(btn => {
-            btn.classList.remove('btn-warning');
-            btn.classList.add('btn-outline-warning');
-        });
-        
-        // Recargar lista de usuarios y seleccionar el nuevo
-        await loadUsers();
-        currentUserId = result.userId;
-        document.getElementById('userSelect').value = result.userId;
-        
-        // Cargar datos del nuevo usuario
-        await loadUserRatings(result.userId);
-        await loadUserBasedRecommendations(result.userId);
-        await loadItemBasedRecommendations(result.userId);
-        
-        alert(`Usuario creado exitosamente con ID: ${result.userId}`);
-    } catch (error) {
-        console.error('Error creando usuario:', error);
-        alert('Error al crear usuario');
-    }
-});
-*/
 
 // Eventos para calificar películas
 document.querySelectorAll('.rating-btn').forEach(btn => {
@@ -724,7 +605,6 @@ document.getElementById('submitRatingBtn').addEventListener('click', async () =>
 
 // Inicializar la aplicación
 window.addEventListener('DOMContentLoaded', async () => {
-    await loadUsers();
     await loadPopularMovies();
     await loadAllMovies();
 });

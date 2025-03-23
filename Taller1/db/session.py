@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from database import SessionLocal
+from db.database import SessionLocal
 
 # Función para obtener una sesión de base de datos
 def get_db():

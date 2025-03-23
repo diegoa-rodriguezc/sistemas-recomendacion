@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Form, Depends, Request
+from fastapi import FastAPI, HTTPException, Form, Depends, Request, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -11,6 +11,11 @@ import numpy as np
 import joblib
 import os
 from pydantic import BaseModel
+from sqlalchemy import asc, desc
+from sqlalchemy.orm import Session
+from db.models import User as DBUser, movie as DBMovie, rating as DBRating
+from db.session import get_db
+from sqlalchemy import func
 
 # Modelos para la API
 class User(BaseModel):
@@ -26,7 +31,7 @@ class Rating(BaseModel):
     userId: int
     movieId: int
     rating: float
-    timestamp: int
+    timestamp: datetime
 
 class NewUser(BaseModel):
     username: str
@@ -46,8 +51,10 @@ class PaginatedResponse(BaseModel):
     offset: int
 
 # Inicializar FastAPI
-app = FastAPI(title="Sistema de Recomendación de Películas",
-              description="API para el Taller 1 de Sistemas de Recomendación")
+app = FastAPI(
+    title="Sistema de Recomendación de Películas",
+    description="API para el Taller 1 de Sistemas de Recomendación"
+    )
 
 # Configurar CORS
 app.add_middleware(
@@ -65,43 +72,40 @@ templates = Jinja2Templates(directory="templates")
 MODEL_USER_PATH = "data/modelUser_pearson.joblib"
 MODEL_ITEM_PATH = "data/modelItem_pearson.joblib"
 
+model_user = None
+model_item = None
+
 try:
     model_user = joblib.load(MODEL_USER_PATH)
     model_item = joblib.load(MODEL_ITEM_PATH)
 except Exception as e:
     print(f"Error cargando los modelos: {e}")
-    model_user = None
-    model_item = None
 
-# Cargar datos de MovieLens
-try:
-    # Ajusta las rutas según donde tengas tus archivos
-    movies_df = pd.read_csv("data/movie.csv")
-    ratings_df = pd.read_csv("data/rating.csv")
+# Variable global para almacenar en caché las recomendaciones
+recommendations_cache = {}
 
-    # Crear un diccionario para mapear movieId a información de la película
-    movies_dict = {
-        row['movieId']: {
-            'title': row['title'],
-            'genres': row['genres']
-        } for _, row in movies_df.iterrows()
+# Tiempo de expiración de la caché (por ejemplo, 1 hora)
+CACHE_EXPIRY = timedelta(hours=1)
+
+# Función para obtener el conjunto de usuarios y el ID máximo
+def get_users_set_and_max_id(db: Session):
+    
+    max_id_result = db.query(func.max(DBUser.userId)).scalar()
+    max_user_id = max_id_result if max_id_result else 0
+
+    users_set = {user_id for (user_id,) in db.query(DBUser.userId).all()}
+
+    return users_set, max_user_id
+
+# Función para obtener un diccionario de películas
+def get_movies_dict(db: Session):
+    movies = db.query(DBMovie).all()
+    return {
+        movie.movieId: {
+            'title': movie.title,
+            'genres': movie.genres
+        } for movie in movies
     }
-    
-    # Crear un set de usuarios existentes
-    users_set = set(ratings_df['userId'].unique())
-    max_user_id = max(users_set)
-    
-    # Crear un dataframe para almacenar nuevos usuarios y sus ratings
-    new_users_ratings = pd.DataFrame(columns=['userId', 'movieId', 'rating', 'timestamp'])
-    
-except Exception as e:
-    print(f"Error cargando los datos: {e}")
-    movies_df = pd.DataFrame()
-    ratings_df = pd.DataFrame()
-    movies_dict = {}
-    users_set = set()
-    max_user_id = 0
-    new_users_ratings = pd.DataFrame()
 
 def get_from_cache(key):
     if key in recommendations_cache:
@@ -118,55 +122,103 @@ def set_in_cache(key, data):
     recommendations_cache[key] = (datetime.now(), data)
 
 # Función para obtener las películas más populares (para nuevos usuarios)
-def get_popular_movies(n=20):
-    # Agrupar por película y contar número de ratings
-    movie_popularity = ratings_df.groupby('movieId').size().reset_index(name='count')
-    # Unir con información de películas
-    popular_movies = movie_popularity.merge(movies_df, on='movieId')
-    # Ordenar por popularidad y tomar las N más populares
-    popular_movies = popular_movies.sort_values('count', ascending=False).head(n)
-    return popular_movies[['movieId', 'title', 'genres']].to_dict('records')
+def get_popular_movies(db: Session, n=20):
+    # Contar número de ratings por película
+    popular_movies_query = (
+        db.query(
+            DBRating.movieId,
+            func.count(DBRating.id).label('count')
+        )
+        .group_by(DBRating.movieId)
+        .order_by(func.count(DBRating.id).desc())
+        .limit(n)
+    )
+    
+    popular_movie_ids = [movie.movieId for movie in popular_movies_query]
+    
+    # Obtener información de las películas populares
+    movies = (
+        db.query(DBMovie)
+        .filter(DBMovie.movieId.in_(popular_movie_ids))
+        .all()
+    )
+    
+    # Crear resultado
+    result = []
+    for movie in movies:
+        result.append({
+            'movieId': movie.movieId,
+            'title': movie.title,
+            'genres': movie.genres
+        })
+    
+    return result
 
 # Función para obtener el historial de ratings de un usuario
-def get_user_ratings(userId):
-    # Obtener ratings del dataset original
-    user_ratings = ratings_df[ratings_df['userId'] == userId]
+def get_user_ratings(db: Session, userId):
+    # Obtener los ratings del usuario junto con la información de las películas
+    ratings = (
+        db.query(DBRating, DBMovie)
+        .join(DBMovie, DBRating.movieId == DBMovie.movieId)
+        .filter(DBRating.userId == userId)
+        .all()
+    )
     
-    # Obtener ratings del usuario si es nuevo
-    if userId > max_user_id:
-        new_user_ratings = new_users_ratings[new_users_ratings['userId'] == userId]
-        user_ratings = pd.concat([user_ratings, new_user_ratings])
+    result = []
+    for rating, movie in ratings:
+        result.append({
+            'movieId': movie.movieId,
+            'title': movie.title,
+            'genres': movie.genres,
+            'rating': rating.rating
+        })
     
-    # Unir con información de películas
-    user_ratings = user_ratings.merge(movies_df, on='movieId')
+    # Ordenar por rating descendente
+    result.sort(key=lambda x: x['rating'], reverse=True)
     
-    return user_ratings[['movieId', 'title', 'genres', 'rating']].sort_values('rating', ascending=False).to_dict('records')
-
+    return result
 
 # Función para generar recomendaciones user-user
-def get_user_based_recommendations(userId, n=100, filter_ratings=None):
+def get_user_based_recommendations(db: Session, userId, n=100, filter_ratings=None):
     if model_user is None:
         raise HTTPException(status_code=500, detail="Modelo user-user no disponible")
 
+    user_exists = db.query(func.count(DBUser.userId)).filter(DBUser.userId == userId).scalar() > 0
+    
     # Verificar si el usuario existe en los datos
-    if userId not in users_set:
+    if not user_exists:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     # Obtener películas que el usuario ya calificó
-    user_rated_movies = set(ratings_df[ratings_df['userId'] == userId]['movieId'])
+    user_rated_query = db.query(DBRating.movieId).filter(DBRating.userId == userId)
+    user_rated_movies = {rating.movieId for rating in user_rated_query}
+
+    # Obtener todas las películas
+    all_movies_query = db.query(DBMovie.movieId)
+    all_movies = {movie.movieId for movie in all_movies_query}
 
     # Filtrar películas a predecir
-    movies_to_predict = set(movies_df['movieId']) - user_rated_movies
+    movies_to_predict = all_movies - user_rated_movies
     
     # Para mejor rendimiento, limitar el número de películas a predecir
-    # si hay muchas películas sin calificar
     movies_sample = list(movies_to_predict)
-    if len(movies_sample) > 500:  # Si hay más de 500 películas, tomar una muestra
-        # Deterministic selection: use most popular movies instead of random
-        movie_popularity = ratings_df.groupby('movieId').size().reset_index(name='count')
-        movie_popularity = movie_popularity[movie_popularity['movieId'].isin(movies_sample)]
-        movie_popularity = movie_popularity.sort_values('count', ascending=False).head(500)
-        movies_sample = movie_popularity['movieId'].tolist()
+    if len(movies_sample) > 500:
+        # Obtener las películas más populares
+        popular_movies_query = (
+            db.query(
+                DBRating.movieId,
+                func.count(DBRating.id).label('count')
+            )
+            .filter(DBRating.movieId.in_(movies_sample))
+            .group_by(DBRating.movieId)
+            .order_by(func.count(DBRating.id).desc())
+            .limit(500)
+        )
+        
+        movies_sample = [movie.movieId for movie in popular_movies_query]
+
+    # Obtener diccionario de películas
+    movies_dict = get_movies_dict(db)
 
     # Preprocesar el filtro de ratings
     filter_list = None
@@ -247,31 +299,48 @@ def get_user_based_recommendations(userId, n=100, filter_ratings=None):
     # Limitar al número solicitado
     return recommendations[:n]
 
-
 # Función para generar recomendaciones item-item
-def get_item_based_recommendations(userId, n=100, filter_ratings=None):
+def get_item_based_recommendations(db: Session, userId, n=100, filter_ratings=None):
     if model_item is None:
         raise HTTPException(status_code=500, detail="Modelo item-item no disponible")
+
+    # Obtener el conjunto de usuarios
+    users_set, _ = get_users_set_and_max_id(db)
 
     # Verificar si el usuario existe en los datos
     if userId not in users_set:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     # Obtener películas que el usuario ya calificó
-    user_rated_movies = set(ratings_df[ratings_df['userId'] == userId]['movieId'])
+    user_rated_query = db.query(DBRating.movieId).filter(DBRating.userId == userId)
+    user_rated_movies = {rating.movieId for rating in user_rated_query}
+
+    # Obtener todas las películas
+    all_movies_query = db.query(DBMovie.movieId)
+    all_movies = {movie.movieId for movie in all_movies_query}
 
     # Filtrar películas a predecir
-    movies_to_predict = set(movies_df['movieId']) - user_rated_movies
+    movies_to_predict = all_movies - user_rated_movies
     
     # Para mejor rendimiento, limitar el número de películas a predecir
-    # si hay muchas películas sin calificar
     movies_sample = list(movies_to_predict)
-    if len(movies_sample) > 500:  # Si hay más de 500 películas, tomar una muestra
-        # Deterministic selection: use most popular movies instead of random
-        movie_popularity = ratings_df.groupby('movieId').size().reset_index(name='count')
-        movie_popularity = movie_popularity[movie_popularity['movieId'].isin(movies_sample)]
-        movie_popularity = movie_popularity.sort_values('count', ascending=False).head(500)
-        movies_sample = movie_popularity['movieId'].tolist()
+    if len(movies_sample) > 500:
+        # Obtener las películas más populares
+        popular_movies_query = (
+            db.query(
+                DBRating.movieId,
+                func.count(DBRating.id).label('count')
+            )
+            .filter(DBRating.movieId.in_(movies_sample))
+            .group_by(DBRating.movieId)
+            .order_by(func.count(DBRating.id).desc())
+            .limit(500)
+        )
+        
+        movies_sample = [movie.movieId for movie in popular_movies_query]
+
+    # Obtener diccionario de películas
+    movies_dict = get_movies_dict(db)
 
     # Preprocesar el filtro de ratings
     filter_list = None
@@ -363,16 +432,19 @@ def get_item_based_recommendations(userId, n=100, filter_ratings=None):
     # Limitar al número solicitado
     return recommendations[:n]
 
-
 # Rutas de la API
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.post("/login")
-async def login(request: Request, userId: int = Form(...)):
-    if userId not in users_set:
+async def login(request: Request, userId: int = Form(...), db: Session = Depends(get_db)):
+    # Verificar el usuario en la base de datos
+    user = db.query(DBUser).filter(DBUser.userId == userId).first()
+    
+    if not user:
         return templates.TemplateResponse("login.html", {"request": request, "error": "Usuario no encontrado"})
+    
     response = RedirectResponse(url=f"/index?userId={userId}", status_code=303)
     response.set_cookie(key="userId", value=str(userId))  # Guardar sesión
     return response
@@ -413,46 +485,58 @@ async def logout(request: Request):
 async def index(request: Request, userId: int):
     return templates.TemplateResponse("index.html", {"request": request, "userId": userId})
 
-
 @app.get("/users", response_model=List[User])
-async def get_users(limit: int = 300):
-    users = []
-    # Obtener usuarios del dataset original
-    for userId in list(users_set)[:limit]:
-        users.append({"userId": int(userId), "username": f"Usuario {userId}"})
-    
-    # Añadir usuarios nuevos si existen
-    new_user_ids = set(new_users_ratings['userId'].unique())
-    for userId in new_user_ids:
-        if userId not in users_set:
-            users.append({"userId": int(userId), "username": f"Nuevo Usuario {userId}"})
-    
-    return users
+async def get_users(db: Session = Depends(get_db), limit: int = 300):
+    users_db = db.query(DBUser).limit(limit).all()
+    return [{"userId": user.userId, "username": user.userName or f"Usuario {user.userId}"} for user in users_db]
 
 @app.get("/movies", response_model=List[Movie])
-async def get_movies(limit: int = 100):
-    return [
-        {"movieId": int(row['movieId']), "title": row['title'], "genres": row['genres']}
-        for _, row in movies_df.head(limit).iterrows()
-    ]
+async def get_movies(
+    db: Session = Depends(get_db), 
+    limit: int = Query(100, gt=0, le=1000),  # Limita el número de resultados entre 1 y 1000
+    offset: int = Query(0, ge=0),  # Permite paginación
+    order: str = Query("asc", regex="^(asc|desc)$")  # Permite ordenar dinámicamente
+    ):
+    
+    order_by_column = asc(DBMovie.title) if order == "asc" else desc(DBMovie.title)
+
+    movies_db = db.query(DBMovie).order_by(order_by_column).offset(offset).limit(limit).all()
+
+    return [{"movieId": movie.movieId, "title": movie.title, "genres": movie.genres} for movie in movies_db]
 
 @app.get("/popular-movies", response_model=List[Movie])
-async def get_popular():
-    return get_popular_movies()
+async def get_popular(db: Session = Depends(get_db)):
+    return get_popular_movies(db)
+
+@app.get("/user/{userId}", response_model=User)
+async def get_user(userId: int, db: Session = Depends(get_db)):
+    try:
+        user = db.query(DBUser).filter(DBUser.userId == userId).first()
+       
+        if user is None:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        user_dict = {
+            "userId": user.userId,
+            "username": user.userName if (user.userName) else f"Usuario #{userId}" # if hasattr(user, 'userName ') else f"Usuario #{userId}"
+        }
+
+        return user_dict
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en la base de datos: {str(e)}")
+
 
 @app.get("/user/{userId}/ratings", response_model=List[Dict])
-async def get_ratings(userId: int):
-    return get_user_ratings(userId)
-
-# Variable global para almacenar en caché las recomendaciones
-recommendations_cache = {}
-
-# Tiempo de expiración de la caché (por ejemplo, 1 hora)
-CACHE_EXPIRY = timedelta(hours=1)
+async def get_ratings(userId: int, db: Session = Depends(get_db)):
+    return get_user_ratings(db, userId)
 
 @app.get("/user/{userId}/recommendations/user-based", response_model=PaginatedResponse)
-async def get_user_recommendations(userId: int, limit: int = 9, offset: int = 0, filter_ratings: Optional[str] = None):
-    if userId not in users_set and userId not in set(new_users_ratings['userId'].unique()):
+async def get_user_recommendations(userId: int, db: Session = Depends(get_db), limit: int = 9, offset: int = 0, filter_ratings: Optional[str] = None):
+    # Verificar si el usuario existe
+    user_exists = db.query(DBUser.userId).filter(DBUser.userId == userId).first() is not None
+    
+    if not user_exists:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     # Crear una clave de caché única
@@ -463,27 +547,31 @@ async def get_user_recommendations(userId: int, limit: int = 9, offset: int = 0,
     
     if all_recommendations is None:
         # Si no está en caché, calcular las recomendaciones
-        all_recommendations = get_user_based_recommendations(userId, n=100, filter_ratings=filter_ratings)
-        
+        all_recommendations = get_user_based_recommendations(db, userId, n=100, filter_ratings=filter_ratings)
+
         # Ordenar de manera determinística
-        all_recommendations.sort(key=lambda x: (-x["predicted_rating"], x["movieId"]))
+        #all_recommendations.sort(key=lambda x: (-x["predicted_rating"], x["movieId"]))
         
         # Guardar en caché
         set_in_cache(cache_key, all_recommendations)
     
+    total = len(all_recommendations)
+
     # Aplicar paginación
     paginated_recommendations = all_recommendations[offset:offset+limit]
-    
+
     return {
         "items": paginated_recommendations,
-        "total": len(all_recommendations),
+        "total": total,
         "limit": limit,
         "offset": offset
     }
 
 @app.get("/user/{userId}/recommendations/item-based", response_model=PaginatedResponse)
-async def get_item_recommendations(userId: int, limit: int = 9, offset: int = 0, filter_ratings: Optional[str] = None):
-    if userId not in users_set and userId not in set(new_users_ratings['userId'].unique()):
+async def get_item_recommendations(userId: int, db: Session = Depends(get_db), limit: int = 9, offset: int = 0, filter_ratings: Optional[str] = None):
+    # Verificar si el usuario existe
+    user_exists = db.query(DBUser.userId).filter(DBUser.userId == userId).first() is not None
+    if not user_exists:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     # Crear una clave de caché única
@@ -494,88 +582,119 @@ async def get_item_recommendations(userId: int, limit: int = 9, offset: int = 0,
 
     if all_recommendations is None:
         # Si no está en caché, calcular las recomendaciones
-        all_recommendations = get_item_based_recommendations(userId, n=100, filter_ratings=filter_ratings)
+        all_recommendations = get_item_based_recommendations(db, userId, n=100, filter_ratings=filter_ratings)
         
         # Ordenar de manera determinística
-        all_recommendations.sort(key=lambda x: (-x["predicted_rating"], x["movieId"]))
+        #all_recommendations.sort(key=lambda x: (-x["predicted_rating"], x["movieId"]))
         
         # Guardar en caché
         set_in_cache(cache_key, all_recommendations)
     
-    
+    total = len(all_recommendations)
+
     # Aplicar paginación
     paginated_recommendations = all_recommendations[offset:offset+limit]
     
     # Retornar meta información para la paginación
     return {
         "items": paginated_recommendations,
-        "total": len(all_recommendations),
+        "total": total,
         "limit": limit,
         "offset": offset
     }
 
 @app.post("/users/new")
-async def create_user(new_user: NewUser):
-    global max_user_id, ratings_df, users_set
-    
-    # Crear nuevo userId
-    new_id = max_user_id + 1
-    max_user_id = new_id
-    users_set.add(new_id)  # Agregar usuario a la lista de usuarios existentes
-    
-    # Guardar ratings del nuevo usuario
-    timestamp = pd.Timestamp.now().timestamp()
-    new_ratings = []
+async def create_user(new_user: NewUser, db: Session = Depends(get_db)):
+    try:
+        # Obtener el máximo ID de usuario
+        _, max_user_id = get_users_set_and_max_id(db)
+        
+        # Crear nuevo userId
+        new_id = max_user_id + 1
+        
+        # Crear el nuevo usuario en la base de datos
+        db_user = DBUser(userId=new_id, userName=new_user.username)  # Usar el nombre proporcionado
+        db.add(db_user)
+        
+        # Guardar ratings del nuevo usuario
+        timestamp = datetime.now().timestamp()
+        # Convertirlo a un objeto datetime 
+        timestamp_dt = datetime.fromtimestamp(timestamp)
 
-    for rating_data in new_user.ratings:
-        for movieId, rating in rating_data.items():
-            new_ratings = pd.DataFrame({
-                'userId': [new_id],
-                'movieId': [int(movieId)],
-                'rating': [float(rating)],
-                'timestamp': [int(timestamp)]
-            })
-            #new_users_ratings = pd.concat([new_users_ratings, new_rating], ignore_index=True)
-    if new_ratings:
-        new_ratings_df = pd.DataFrame(new_ratings)
-        ratings_df = pd.concat([ratings_df, new_ratings_df], ignore_index=True)  # Agregar a ratings_df
-        #ratings_df.to_csv("rating.csv", index=False)  # Guardar en CSV
-        new_ratings_df.to_csv("rating.csv", mode='a', header=False, index=False)
+        rating_count = 0
+        
+        for rating_data in new_user.rating:
+            for movieId, rating_value in rating_data.items():
+                # Verificar si existe la película
+                movie = db.query(DBMovie).filter(DBMovie.movieId == int(movieId)).first()
+                if movie:
+                    db_rating = DBRating(
+                        id=None,  # Autoincremento
+                        userId=new_id,
+                        movieId=int(movieId),
+                        rating=float(rating_value),
+                        timestamp=timestamp_dt
+                    )
+                    db.add(db_rating)
+                    rating_count += 1
+        
+        # Commit para guardar los cambios
+        db.commit()
+        
+        return {"userId": new_id, "username": new_user.username, "num_ratings": rating_count}
     
-    return {"userId": new_id, "username": new_user.username, "num_ratings": len(new_user.ratings)}
+    except Exception as e:
+        # Revertir transacción en caso de error
+        db.rollback()
+        print(f"Error al crear usuario: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error al crear usuario: {str(e)}")
 
 @app.post("/user/{userId}/rate")
-async def add_rating(userId: int, movieId: int, rating: float):
-    #global new_users_ratings
-    global ratings_df, users_set
-    
-    if userId not in users_set:
+async def add_rating(userId: int, movieId: int, rating: float, db: Session = Depends(get_db)):
+    # Verificar si el usuario existe
+    user = db.query(DBUser).filter(DBUser.userId == userId).first()
+    if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     
     if rating < 0.5 or rating > 5.0:
         raise HTTPException(status_code=400, detail="El rating debe estar entre 0.5 y 5.0")
     
-    # Agregar nuevo rating
-    timestamp = pd.Timestamp.now().timestamp()
-    new_rating = pd.DataFrame({
-        'userId': [userId],
-        'movieId': [movieId],
-        'rating': [rating],
-        'timestamp': [int(timestamp)]
-    })
+    # Verificar si la película existe
+    movie = db.query(DBMovie).filter(DBMovie.movieId == movieId).first()
+    if not movie:
+        raise HTTPException(status_code=404, detail="Película no encontrada")
     
-    #new_users_ratings = pd.concat([new_users_ratings, new_rating], ignore_index=True)
-    ratings_df = pd.concat([ratings_df, new_rating], ignore_index=True)
-    #ratings_df.to_csv("rating.csv", index=False)  # Guardar en CSV
-    # Guardar en CSV sin sobrescribir datos previos
-    new_rating.to_csv("rating.csv", mode='a', header=False, index=False)
-    #print(new_users_ratings)
-    #return {"userId": userId, "movieId": movieId, "rating": rating}
-    print(ratings_df.tail(5))
+    # Verificar si ya existe un rating para este usuario y película
+    existing_rating = db.query(DBRating).filter(
+        DBRating.userId == userId,
+        DBRating.movieId == movieId
+    ).first()
+    
+    timestamp = int(datetime.now().timestamp())
+    # Convertirlo a un objeto datetime 
+    timestamp_dt = datetime.fromtimestamp(timestamp)
+    
+    if existing_rating:
+        # Actualizar rating existente
+        existing_rating.rating = rating
+        existing_rating.timestamp = timestamp_dt
+    else:
+        # Agregar nuevo rating
+        new_rating = DBRating(
+            id=None,  # Autoincremento
+            userId=userId,
+            movieId=movieId,
+            rating=rating,
+            timestamp=timestamp_dt
+        )
+        db.add(new_rating)
+    
+    # Guardar cambios
+    db.commit()
 
     # Limpiar la caché para este usuario
     for key in list(recommendations_cache.keys()):
-        if key.startswith(f"user_{userId}"):
+        if key.startswith(f"user_{userId}") or key.startswith(f"item_{userId}"):
             del recommendations_cache[key]
     
     return {"message": "Calificación guardada", "userId": userId, "movieId": movieId, "rating": rating}

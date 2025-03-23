@@ -1,7 +1,7 @@
-# python tables.py
+# python -m db.tables
 
-from database import engine
-from models import Base
+from db.database import engine
+from db.models import Base
 
 """
 Crea tablas en la base de datos

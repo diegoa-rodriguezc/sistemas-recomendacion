@@ -56,6 +56,37 @@
             margin-right: 15px;
             font-weight: 500;
         }
+
+        #pageLoadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            flex-direction: column;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #007bff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        
     </style>
     <script>
         document.addEventListener("DOMContentLoaded", async function () {
@@ -64,16 +95,79 @@
             const userId = params.get("userId");
 
             if (userId) {
-                await loadUsers(); // Cargar la lista de usuarios
+                // Convertir el ID a número y guardar en la variable global y el campo oculto
                 currentUserId = parseInt(userId);
-                document.getElementById("userSelect").value = userId; // Seleccionar usuario en el dropdown
-                triggerUserSelection(userId); // Ejecutar funciones del usuario
+                document.getElementById("userIdField").value = currentUserId;
+                
+                // Cargar la información del usuario
+                await loadUserInfo(currentUserId);
+                
+                // Ejecutar funciones del usuario (ratings, recomendaciones)
+                triggerUserSelection(currentUserId);
+
+                // Ocultar overlay de carga al final
+                hideLoadingOverlay();
+
+            } else {
+                console.error("No se proporcionó un ID de usuario en la URL");
+                
+                hideLoadingOverlay();
             }
             
             // Set up filter listeners once at page load
             setupFilterListeners();
         });
 
+        // Función de carga
+        function hideLoadingOverlay() {
+            const overlay = document.getElementById('pageLoadingOverlay');
+            if (overlay) {
+                // Añadir una pequeña transición para que no desaparezca abruptamente
+                overlay.style.opacity = '0';
+                overlay.style.transition = 'opacity 0.5s';
+                
+                // Remover el elemento después de la transición
+                setTimeout(() => {
+                    overlay.remove();
+                }, 500);
+            }
+        }
+
+        // Función para cargar la información del usuario
+        async function loadUserInfo(userId) {
+            try {
+                const response = await fetch(`/user/${userId}`);
+                
+                // Revisar el estado de la respuesta
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(`Error ${response.status}: ${errorData.detail || 'Error desconocido'}`);
+                }
+                
+                const userData = await response.json();
+                
+                // Mostrar el nombre del usuario en el campo de texto
+                const userIdField = document.getElementById("userId");
+                const userNameField = document.getElementById("userName");
+                if (userData.userId && userData.username) {
+                    userIdField.value = userData.userId;
+                    userNameField.value = userData.username;
+                } else {
+                    userNameField.value = `Usuario #${userId}`;
+                    console.warn("No se encontró nombre de usuario en los datos recibidos");
+                }
+                
+                // Mostrar la tarjeta de calificaciones de usuario
+                document.getElementById("userRatingsCard").style.display = "block";
+            } catch (error) {
+                console.error("Error al cargar la información del usuario:", error);
+                document.getElementById("userName").value = `Usuario #${userId}`;
+                
+                // Opcional: mostrar notificación de error al usuario
+                alert(`No se pudo cargar la información del usuario: ${error.message}`);
+            }
+        }
+        
         function setupFilterListeners() {
             const userCheckboxes = document.querySelectorAll('.user-filter-checkbox');
             userCheckboxes.forEach(checkbox => {
@@ -116,12 +210,16 @@
             return values;
         }
 
-        function triggerUserSelection(userId) {
-            if (!userId) return;
+        async function triggerUserSelection(userId) {
+            if (!userId) {
+                console.error("Se intentó cargar un usuario sin ID");
+                return;
+            }
 
-            loadUserRatings(userId); // Cargar ratings del usuario
+            // Cargar ratings del usuario
+            await loadUserRatings(userId);
             
-            // Por defecto, seleccionar "Todas" en ambos filtros
+            // Seleccionar "Todas" en ambos filtros por defecto
             document.querySelector('.user-filter-checkbox[value="all"]').checked = true;
             document.querySelector('.item-filter-checkbox[value="all"]').checked = true;
             
@@ -136,8 +234,11 @@
                 cb.disabled = true;
             });
             
-            loadRecommendations(userId, ['all'], "user-based"); // Cargar recomendaciones user-user
-            loadRecommendations(userId, ['all'], "item-based"); // Cargar recomendaciones item-item
+            // Cargar recomendaciones
+            await Promise.all([
+                loadRecommendations(userId, ['all'], "user-based"),
+                loadRecommendations(userId, ['all'], "item-based")
+            ]);
         }
 
         // Variables para almacenar el estado de paginación
@@ -216,7 +317,6 @@
                 }
                 
                 const data = await response.json();
-                console.log(`Received ${data.items.length} recommendations for ${type} (total: ${data.total})`);
                 
                 const recommendationsDiv = document.getElementById(
                     type === "user-based" ? "userBasedRecommendations" : "itemBasedRecommendations"
@@ -327,8 +427,11 @@
         }
         
         function handleFilterSelection(className, type) {
-            const userId = document.getElementById("userSelect").value;
-            if (!userId) return;
+            const userId = currentUserId;
+            if (!userId) {
+                console.error("No hay un usuario seleccionado");
+                return;
+            }
 
             const checkboxes = document.querySelectorAll(`.${className}`);
             const allCheckbox = document.querySelector(`.${className}[value="all"]`);
@@ -379,6 +482,11 @@
     </script>
 </head>
 <body>
+    <div id="pageLoadingOverlay">
+        <div class="loading-spinner"></div>
+        <h3>Cargando sistema de recomendación...</h3>
+    </div>
+
     <div class="container my-5">
         <header class="text-center mb-5">
             <h1>Sistema de Recomendación de Películas</h1>
@@ -394,10 +502,12 @@
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label for="userSelect" class="form-label"></label>
-                            <select class="form-select" id="userSelect" disabled>
-                                <option value="">Seleccionar usuario...</option>
-                            </select>
+                            <label for="userName" class="form-label">ID Usuario</label>
+                            <input type="text" class="form-control" id="userId" disabled>
+                            <label for="userName" class="form-label">Nombre de Usuario</label>
+                            <input type="text" class="form-control" id="userName" disabled>
+                            <input type="hidden" id="userIdField" value="">
+                            <input type="hidden" id="userNameField" value="">
                         </div>
                     </div>
                 </div>

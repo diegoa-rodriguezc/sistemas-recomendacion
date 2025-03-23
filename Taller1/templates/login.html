@@ -211,6 +211,9 @@
                     // Agregar nueva calificación
                     userRatings.push({ [movieId]: ratingValue });
                 }
+                
+                // Imprimir para depuración
+                console.log("Rating actualizado:", userRatings);
             } else {
                 // Eliminar la calificación si es 0
                 userRatings = userRatings.filter(r => !Object.hasOwnProperty.call(r, movieId));
@@ -272,6 +275,11 @@
                 this.disabled = true;
                 this.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Registrando...';
                 
+                console.log("Enviando datos:", {
+                    username: username,
+                    rating: userRatings
+                });
+                
                 // Enviar datos al servidor
                 const response = await fetch('/users/new', {
                     method: 'POST',
@@ -280,15 +288,19 @@
                     },
                     body: JSON.stringify({
                         username: username,
-                        ratings: userRatings
+                        rating: userRatings
                     })
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Error al registrar usuario');
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Error al registrar usuario');
                 }
                 
                 const data = await response.json();
+                
+                // Guardar userId en localStorage o cookie si es necesario
+                document.cookie = `userId=${data.userId}; path=/`;
                 
                 // Redirigir a la página principal
                 window.location.href = `/index?userId=${data.userId}`;
