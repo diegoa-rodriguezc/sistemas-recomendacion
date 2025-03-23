@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Form, Depends, Request, Query
+from fastapi import FastAPI, HTTPException, Form, Depends, Request, Query, File, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -14,6 +14,7 @@ from pydantic import BaseModel
 from sqlalchemy import asc, desc
 from sqlalchemy.orm import Session
 from db.models import User as DBUser, movie as DBMovie, rating as DBRating
+from db.loadtables import create_movie, create_rating
 from db.session import get_db
 from sqlalchemy import func
 
@@ -698,6 +699,42 @@ async def add_rating(userId: int, movieId: int, rating: float, db: Session = Dep
             del recommendations_cache[key]
     
     return {"message": "Calificación guardada", "userId": userId, "movieId": movieId, "rating": rating}
+
+@app.post("/upload/movie", tags=['Upload'])
+def upload_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    # Leer datos del CSV
+    movie_data = pd.read_csv(file.file, 
+                             delimiter=',',
+                             index_col=False, 
+                             header=0)
+    
+    # Verificar que las columnas sean las correctas
+    expected_columns = {'movieId', 'title', 'genres'}
+    if not expected_columns.issubset(movie_data.columns):
+        return {"error": "El archivo CSV no tiene las columnas esperadas."}
+    
+    # Cargar 
+    create_movie(db, movie_data)
+
+    return {"message": "CSV movie uploaded successfully!"}
+
+@app.post("/upload/rating", tags=['Upload'])
+def upload_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    # Leer datos del CSV
+    rating_data = pd.read_csv(file.file, 
+                             delimiter=',',
+                             index_col=False, 
+                             header=0)
+    
+    # Verificar que las columnas sean las correctas
+    expected_columns = {'userId','movieId','rating','timestamp'}
+    if not expected_columns.issubset(rating_data.columns):
+        return {"error": "El archivo CSV no tiene las columnas esperadas."}
+    
+    # Cargar 
+    create_rating(db, rating_data)
+
+    return {"message": "CSV rating uploaded successfully!"}
 
 # Montar archivos estáticos
 app.mount("/static", StaticFiles(directory="static"), name="static")
