@@ -38,7 +38,7 @@ El presente Taller se ha realizado usando las herramientas:
 
 ### Requerimientos
 
-- **Sistema Operativo**: Windows 10, macOS 10.15 o superio, distribuciones de Linux.
+- **Sistema Operativo**: Windows 10/11, macOS 10.15 o superior, distribuciones de Linux.
 - **Python**: Versiones >= 3.9. Se recomienda utilizar un entorno virtual para evitar conflictos de dependencias.
 - **Librerías**: utilizar el archivo `requirements.txt` para la instalación de las mismas.
 
@@ -105,7 +105,7 @@ uvicorn nombre_del_archivo:app --reload
 uvicorn app:app --reload
 ```
 
-7. Una vez el servidor presente el mensaje de inicio correcto, similar al siguiente:
+7. Una vez el servidor presente el mensaje de inicio correcto, similar al siguiente, se puede acceder a la aplación:
    ```
    INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
    INFO:     Started reloader process [15952] using StatReload
@@ -127,8 +127,17 @@ Se pueden explorar los demás end-point de la URL mencionada
 
 ## Acceso a aplicación
 
-> **NOTA** Si es la primera vez que ingresa a la aplciación y NO se ha realizado la carga de datos acorde a lo mencionado previamente, el sistema no genera no visualiza los datos correctamente. Si ya se ha cargado las tablas respectivas, omitir este mensaje.
+> **NOTA** Si es la primera vez que ingresa a la aplicación y NO ha realizado la carga de datos acorde a lo mencionado previamente, el sistema no podrá generar ni visualizar la información correctamente. Si ya se ha cargado las tablas respectivas, omitir este mensaje.
  
 Una vez se ha iniciado el servidor, se debe acceder a la url http://127.0.0.1:8000/ 
 
 Una vez cargada la página, se evidencia la interfaz de acceso donde se ingresa mediante la digitación de un `id` de usuario, o crear un nuevo usuario ingresando al botón de `Registrar`.
+
+## Equipo de Trabajo
+
+| Nombre | 
+|-------------|
+| Andrés Felipe Mendez Antolínez |
+| Diego Alberto Rodríguez Cruz |
+| Harvy José Benítez Amaya |
+| Juan José Ramírez Cala |
