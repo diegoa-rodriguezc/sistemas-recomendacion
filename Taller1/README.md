@@ -44,11 +44,13 @@ El presente Taller se ha realizado usando las herramientas:
 
 ### Configuración e Instalación
 
-> **NOTA** Asegúrese de tener instalado `git` en su máquina o `GitHub Desktop` para la clonación del repositorio.
+> ✎ **NOTA** Asegúrese de tener instalado `git` en su máquina o `GitHub Desktop` para la clonación del repositorio.
 
 En una ventana de comandos (cmd/terminal), ejecutar los comandos que a continuación se describen:
 
 **Clonar el repositorio**:
+
+> ℹ️ Seleccione una ruta en su equipo/máquina donde desea almacenar los archivos del presente proyecto.
 
 Clone el repositorio en su entorno local:
    ```bash
@@ -61,7 +63,7 @@ Clone el repositorio en su entorno local:
 
 ### Instalación
 
-> En una ventana de comandos (cmd/terminal) y ubicado en la carpeta `Taller1`.
+En una ventana de comandos (cmd/terminal) y ubicado en la carpeta `Taller1` proceder con los siguiente pasos:
 
 1. Instalar la libería respectiva para crear un entorno virtual de trabajo
 
@@ -89,14 +91,17 @@ python -m venv env
 pip install -r requirements.txt
 ```
 
-> **NOTA** Antes de iniciar el servidor se deben ajustar los parámetros de conexión al servidor de Base de datos (usuario, contraseña, servidor, puerto y nombre del esquema), para lo cual se debe modificar el archivo denominado `database.py`. 
-Los atributos a modificar son `user`, `password`, `host`, `port` y `databasename` .
-Usar la cadena de conexión según corresponda para usar MS SQL Server o PostgreSQL.
+> ✎ **NOTA** Antes de iniciar el servidor se deben ajustar los parámetros de conexión al servidor de Base de datos (usuario, contraseña, servidor, puerto y nombre del esquema), para lo cual se debe modificar el archivo denominado `database.py`.
+"postgresql://`USER`:`PASSWORD`@`SERVER`:`PORT`/`SCHEMA`".
+
+> ℹ️ La base de datos utilizada es PostgreSQL, con nombre de esquema `sr_movielens`; se puede usar un nombre de esquema diferente si se prefiere.
 
 5. Una vez ajustado los atributos de la Base de Datos, ejecutar la creación de tablas mediante el comando: 
 ```bash
 python -m db.tables
 ```
+
+> ℹ️ Antes de iniciar el servidor para acceso a la aplicación, se debe descomprimir el contenido de los archivos denominados `modelItem_pearson.zip` y `modelUser_pearson.zip` dentro de la misma carpeta `data`; estos contienen el modelo para el sistema de recomendación.
 
 6. Posterior a la instalación de dependencias y ajuste del archivo de conexión a Base de Datos, iniciar el servidor para uso del API
 uvicorn nombre_del_archivo:app --reload
@@ -118,7 +123,7 @@ uvicorn app:app --reload
 - Carga de archivo `data/movie.csv` usar el end-point `/upload/movie`, dar clic en la opción denominada *Try it out* para seleccionar el archivo mencionado
 - Carga de archivo `data/rating.csv` usar el end-point `/upload/rating`, dar clic en la opción denominada *Try it out* para seleccionar el archivo mencionado
 
-> **NOTA** La carga de información se puede demorar dada la cantidad de registros a ser insertados en las tablas.
+> ✎ **NOTA** La carga de información se puede demorar dada la cantidad de registros a ser insertados en las tablas.
 
 > ⚠️ Si se ejecuta varias veces este paso de carga de información, se pueden perder datos previamente almacenados dado que este hace una limpieza de información antes de insertar la misma.
 
@@ -127,7 +132,7 @@ Se pueden explorar los demás end-point de la URL mencionada
 
 ## Acceso a aplicación
 
-> **NOTA** Si es la primera vez que ingresa a la aplicación y NO ha realizado la carga de datos acorde a lo mencionado previamente, el sistema no podrá generar ni visualizar la información correctamente. Si ya se ha cargado las tablas respectivas, omitir este mensaje.
+> ✎ **NOTA** Si es la primera vez que ingresa a la aplicación y NO ha realizado la carga de datos acorde a lo mencionado previamente, el sistema no podrá generar ni visualizar la información correctamente. Si ya se ha cargado las tablas respectivas, omitir este mensaje.
  
 Una vez se ha iniciado el servidor, se debe acceder a la url http://127.0.0.1:8000/ 
 
