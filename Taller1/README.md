@@ -11,15 +11,15 @@ El presente Taller se ha realizado usando las herramientas:
 .
 ├── data/
 │   ├── df_sample.csv
-│   ├── modelItem_pearson.joblib
-│   ├── modelUser_pearson.joblib
+│   ├── modelItem_pearson.zip
+│   ├── modelUser_pearson.zip
 │   ├── movie.csv
-│   ├── MovieLens_Dataset.zip
 │   ├── rating.csv
 │   ├── test_df.csv
 │   └── train_df.csv
 ├── data/
 │   ├── database.py
+│   ├── loadtables.py
 │   ├── models.py
 │   ├── session.py
 │   └── tables.py
