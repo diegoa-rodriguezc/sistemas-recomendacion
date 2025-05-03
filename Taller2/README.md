@@ -101,17 +101,6 @@ python -m venv env
 ```bash
 pip install -r requirements.txt
 ```
-
-para windows
-```bash
-python -m db.load_data_copy `
-   .\data\yelp_academic_dataset_business.json `
-   .\data\yelp_academic_dataset_checkin.json `
-   .\data\yelp_academic_dataset_review.json `
-   .\data\yelp_academic_dataset_tip.json `
-   .\data\yelp_academic_dataset_user.json
-```
-
 > ✎ **NOTA** Antes de iniciar el servidor se deben ajustar los parámetros de conexión al servidor de Base de datos (usuario, contraseña, servidor, puerto y nombre del esquema), para lo cual se debe modificar el archivo denominado `database.py`.
 "postgresql://`USER`:`PASSWORD`@`SERVER`:`PORT`/`SCHEMA`".
 
@@ -121,7 +110,17 @@ python -m db.load_data_copy `
 ```bash
 python -m db.tables
 ```
-
+   Luego realizar la carga de los datos respectivos en las tablas previamente creadas
+```bash
+python -m db.load_data `
+   .\data\yelp_academic_dataset_business.json `
+   .\data\yelp_academic_dataset_checkin.json `
+   .\data\yelp_academic_dataset_review.json `
+   .\data\yelp_academic_dataset_tip.json `
+   .\data\yelp_academic_dataset_user.json
+```
+> ✎ **NOTA** La carga de información se puede demorar dada la cantidad de registros a ser insertados en las tablas.
+> ⚠️ Si se ejecuta varias veces este paso de carga de información, se pueden perder datos previamente almacenados dado que este hace una limpieza de información antes de insertar la misma.
 
 6. Posterior a la instalación de dependencias y ajuste del archivo de conexión a Base de Datos, iniciar el servidor para uso del API
 uvicorn nombre_del_archivo:app --reload
@@ -139,11 +138,7 @@ uvicorn appFastAPI:app --reload
    INFO:     Application startup complete.
    ```
 
-> ✎ **NOTA** La carga de información se puede demorar dada la cantidad de registros a ser insertados en las tablas.
-
-> ⚠️ Si se ejecuta varias veces este paso de carga de información, se pueden perder datos previamente almacenados dado que este hace una limpieza de información antes de insertar la misma.
-
-Se pueden explorar los demás end-point de la URL mencionada
+Si se requiere, se puede acceder la documentación de los end-point creados al ingresar a la URL http://127.0.0.1:8000/docs
 
 
 ## Acceso a aplicación

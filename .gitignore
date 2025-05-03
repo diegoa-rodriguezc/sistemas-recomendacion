@@ -511,3 +511,21 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/git,windows,linux,macos,python,jupyternotebooks,spark,scala,tortoisegit,gitbook,pydev,pycharm
+Taller1/data/MovieLens_Dataset.zip
+Taller1/data/modelUser_pearson.joblib
+Taller1/data/modelItem_pearson.joblib
+Taller2/app/data/df_business.csv
+Taller2/app/data/df_checkin.csv
+Taller2/app/data/df_review.csv
+Taller2/app/data/df_tip.csv
+Taller2/app/data/df_user.csv
+Taller2/app/data/recommender_model.py
+Taller2/app/data/test_df.csv
+Taller2/app/data/train_df.csv
+Taller2/app/data/Yelp-JSON.zip
+Taller2/app/data/yelp_dataset.tar
+Taller2/app/data/yelp_academic_dataset_user.json
+Taller2/app/data/yelp_academic_dataset_tip.json
+Taller2/app/data/yelp_academic_dataset_review.json
+Taller2/app/data/yelp_academic_dataset_checkin.json
+Taller2/app/data/yelp_academic_dataset_business.json
