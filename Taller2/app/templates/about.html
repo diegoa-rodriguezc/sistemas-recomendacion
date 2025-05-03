@@ -1,0 +1,130 @@
+<!-- templates/about.html -->
+{% extends 'base.html' %}
+
+{% block title %}About Yelp Recommendation System{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h3>About This Project</h3>
+            </div>
+            <div class="card-body">
+                <h4>Yelp Hybrid Recommendation System</h4>
+                <p class="lead">A sophisticated recommendation system that combines collaborative filtering and context-aware recommendations to provide personalized business suggestions.</p>
+                
+                <hr>
+                
+                <h5>Project Overview</h5>
+                <p>This recommendation system is a part of the MINE4201-01 Recommendation Systems course (2025-1). It leverages real Yelp data to provide users with personalized business recommendations based on their past behavior and contextual information.</p>
+                
+                <h5>Key Features</h5>
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0">Collaborative Filtering</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Our system analyzes patterns of user behavior to identify users with similar preferences. It then recommends businesses that similar users have enjoyed.</p>
+                                <ul>
+                                    <!-- <li>User-based collaborative filtering</li>
+                                    <li>Item-based collaborative filtering</li> -->
+                                    <li>Matrix factorization techniques</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-success text-white">
+                                <h5 class="mb-0">Context-Aware Recommendations</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Our system considers contextual factors when making recommendations:</p>
+                                <ul>
+                                    <li>Time of day (morning, afternoon, evening, night)</li>
+                                    <li>Day of the week</li>
+                                    <li>Season</li>
+                                    <li>Location/City</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0">Explainable AI</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Our system provides explanations for why a particular business is recommended, increasing transparency and user trust:</p>
+                                <ul>
+                                    <li>Collaborative-based explanations</li>
+                                    <li>Similar user explanations</li>
+                                    <li>Contextual explanations</li>
+                                    <li>Category-based explanations</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card mb-3">
+                            <div class="card-header bg-danger text-white">
+                                <h5 class="mb-0">User Feedback</h5>
+                            </div>
+                            <div class="card-body">
+                                <p>Our system learns from user feedback to continuously improve recommendations:</p>
+                                <ul>
+                                    <li>Like/dislike buttons for recommendations</li>
+                                    <li>Continuous model updating</li>
+                                    <li>Personalization based on feedback</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <hr/>
+                
+                <h4>Authors</h4>
+                <ul>
+                    <li>Andrés Felipe Méndez Antolínez</li>
+                    <li>Diego Alberto Rodríguez Cruz</li>
+                    <li>Harvy José Benítez Amaya</li>
+                    <li>Juan José Ramírez Cala</li>
+                </ul>
+                
+                <hr>
+
+                <h5 class="mt-4">Technical Details</h5>
+                <p>The application is built using:</p>
+                <ul>
+                    <li><strong>Backend:</strong> Python, FastAPI</li>
+                    <li><strong>Frontend:</strong> HTML, CSS, Bootstrap, JavaScript</li>
+                    <li><strong>Data Visualization:</strong> Matplotlib, Seaborn, Folium</li>
+                    <li><strong>Machine Learning:</strong> Scikit-learn, NumPy, Pandas, Surprise</li>
+                </ul>
+                
+                <h5 class="mt-4">Dataset</h5>
+                <p>This system uses the Yelp Dataset, which includes:</p>
+                <ul>
+                    <li>Business data (location, categories, attributes, etc.)</li>
+                    <li>User data (review history, friend connections, etc.)</li>
+                    <li>Review data (ratings, text, dates, etc.)</li>
+                </ul>
+                
+                <div class="text-center mt-5">
+                    <!-- <p class="text-muted">MINE4201-01 - Recommendation Systems - 2025-1</p> -->
+                    <a href="/" class="btn btn-primary">Back to Home</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

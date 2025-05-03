@@ -1,0 +1,75 @@
+<!-- templates/index.html -->
+{% extends 'base.html' %}
+
+{% block title %}Yelp Recommendation System - Home{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Bienvenido, {{ session.user_name }}</h4>
+                <a href="/logout" class="btn btn-sm btn-outline-light">Cerrar sesión</a>
+            </div>
+            <div class="card-body">
+                <p>ID de Usuario: <strong>{{ session.user_id }}</strong></p>
+                <a href="/user/{{ session.user_id }}" class="btn btn-outline-primary mb-3">Ver tu perfil</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Get Personalized Recommendations</h4>
+            </div>
+            <div class="card-body">
+                <form action="/recommendations" method="post">
+                    <div class="mb-3">
+                        <label for="user_id" class="form-label">Usuario</label>
+                        <input type="text" class="form-control-plaintext" id="user_id_display" value="{{ session.user_name }} ({{ session.user_id }})" readonly>
+                        <input type="hidden" id="user_id" name="user_id" value="{{ session.user_id }}">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="city" class="form-label">City (Optional)</label>
+                        <select class="form-select" id="city" name="city">
+                            <option value="" selected>All Cities</option>
+                            {% for city in cities %}
+                            <option value="{{ city }}">{{ city }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Filter recommendations by city</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="num_recommendations" class="form-label">Number of Recommendations</label>
+                        <input type="number" class="form-control" id="num_recommendations" name="num_recommendations" min="1" max="20" value="10">
+                        <div class="form-text">How many recommendations would you like to see?</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Get Recommendations</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">About This System</h4>
+            </div>
+            <div class="card-body">
+                <p>This recommendation system uses a hybrid approach combining:</p>
+                <ul>
+                    <li><strong>Collaborative Filtering</strong> - Recommends businesses based on similar users' preferences</li>
+                    <li><strong>Context-Aware Recommendations</strong> - Considers time, location, and other contextual factors</li>
+                </ul>
+                <p>The system learns from actual Yelp reviews to provide personalized recommendations.</p>
+                <p>It also provides explanations for why each business is recommended to increase transparency.</p>
+                <a href="/about" class="btn btn-outline-info">Learn More</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

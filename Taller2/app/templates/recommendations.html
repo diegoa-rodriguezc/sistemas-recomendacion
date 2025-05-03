@@ -1,0 +1,136 @@
+<!-- templates/recommendations.html -->
+{% extends 'base.html' %}
+
+{% block title %}Yelp Recommendations{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <div class="card-body">
+        <h5 class="card-title">Recomendaciones para {{ user_id }}</h5>
+        {% if selected_city %}
+            <p class="text-muted">Ciudad: {{ selected_city }}</p>
+        {% else %}
+            <p class="text-muted">Sin filtro de ciudad</p>
+        {% endif %}
+    </div>
+</div>
+
+<h2>Recommendations for User: {{ user_id }}</h2>
+<div class="row recommendation-controls">
+    <div class="col">
+        <a href="/" class="btn btn-primary">Back to Home</a>
+        <a href="/user/{{ user_id }}" class="btn btn-outline-primary">View User Profile</a>
+    </div>
+</div>
+
+{% if map_html %}
+<div class="row">
+    <div class="col">
+        <h4>Recommendations Map</h4>
+        <div class="map-container">
+            {{ map_html|safe }}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row">
+    {% for rec in recommendations %}
+    <div class="col-md-6">
+        <div class="card recommendation-card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">{{ loop.index }}. {{ rec.name }}</h5>
+                <span class="badge score-badge">Score: {{ "%.2f"|format(rec.score) }}</span>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-between mb-2">
+                    <div>
+                        <div class="star-rating">
+                            {% for i in range(5) %}
+                                {% if i < rec.stars|int %}
+                                    <i class="bi bi-star-fill"></i>★
+                                {% elif i < rec.stars and i >= rec.stars|int %}
+                                    <i class="bi bi-star-half"></i>★
+                                {% else %}
+                                    <i class="bi bi-star"></i>☆
+                                {% endif %}
+                            {% endfor %}
+                            <span class="text-muted">({{ rec.stars }})</span>
+                        </div>
+                        <div class="text-muted">{{ rec.city }}</div>
+                    </div>
+                    <div>
+                        <a href="/business/{{ rec.business_id }}" class="btn btn-sm btn-outline-primary">View Details</a>
+                    </div>
+                </div>
+                
+                <div class="mb-2">
+                    {% for category in rec.categories.split(', ') %}
+                    <span class="badge category-badge">{{ category }}</span>
+                    {% endfor %}
+                </div>
+                
+                <div class="explanation-box">
+                    <h6>Why we recommended this:</h6>
+                    <ul class="mb-0">
+                        {% if rec.explanation.get('collaborative') %}
+                        <li>{{ rec.explanation.collaborative }}</li>
+                        {% endif %}
+                        
+                        {% if rec.explanation.get('similar_users') %}
+                        <li>{{ rec.explanation.similar_users }}</li>
+                        {% endif %}
+                        
+                        {% if rec.explanation.get('context') %}
+                        <li>{{ rec.explanation.context }}</li>
+                        {% endif %}
+                        
+                        {% if rec.explanation.get('categories') %}
+                        <li>{{ rec.explanation.categories }}</li>
+                        {% endif %}
+                    </ul>
+                </div>
+                
+                <div class="mt-3">
+                    <button class="btn btn-sm btn-outline-success feedback-btn" onclick="submitFeedback('{{ rec.business_id }}', 'liked')">👍 Like</button>
+                    <button class="btn btn-sm btn-outline-danger feedback-btn" onclick="submitFeedback('{{ rec.business_id }}', 'disliked')">👎 Dislike</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Add the Nueva búsqueda button at the bottom -->
+<div class="text-center mt-4">
+    <a href="/" class="btn btn-primary">Nueva búsqueda</a>
+</div>
+{% endblock %}
+
+{% block extra_css %}{% endblock %}
+
+{% block extra_js %}
+<script>
+    function submitFeedback(businessId, feedback) {
+        fetch('/feedback', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: '{{ user_id }}',
+                business_id: businessId,
+                feedback: feedback,
+                timestamp: new Date().toISOString()
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert('Thanks for your feedback!');
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+        });
+    }
+</script>
+{% endblock %}

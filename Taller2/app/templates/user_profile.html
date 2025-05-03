@@ -1,0 +1,107 @@
+<!-- templates/user_profile.html -->
+{% extends 'base.html' %}
+
+{% block title %}User Profile: {{ user.name }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12 mb-4">
+        <a href="/" class="btn btn-primary">Back to Home</a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h4>User Profile</h4>
+            </div>
+            <div class="card-body">
+                <h5>{{ user.name }}</h5>
+                <p><strong>User ID:</strong> {{ user.user_id }}</p>
+                <p><strong>Member Since:</strong> {{ user.yelping_since }}</p>
+                <p><strong>Review Count:</strong> {{ user.review_count }}</p>
+                <p><strong>Average Rating:</strong> {{ "%.1f"|format(user.average_stars) }} / 5.0</p>
+                <p><strong>Elite Years:</strong> {{ user.elite or 'None' }}</p>
+                <p><strong>Fans:</strong> {{ user.fans }}</p>
+                <p><strong>Useful Votes:</strong> {{ user.useful }}</p>
+                <p><strong>Funny Votes:</strong> {{ user.funny }}</p>
+                <p><strong>Cool Votes:</strong> {{ user.cool }}</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h4>Rating Distribution</h4>
+            </div>
+            <div class="card-body text-center">
+                <img src="{{ rating_chart }}" alt="Rating Distribution" class="img-fluid">
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <div class="stats-card">
+                    <h5>Most Visited Cities</h5>
+                    <ul class="list-group">
+                        {% for city, count in city_counts.items() %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ city }}
+                            <span class="badge bg-primary rounded-pill">{{ count }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="stats-card">
+                    <h5>Favorite Categories</h5>
+                    <ul class="list-group">
+                        {% for category, count in top_categories.items() %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            {{ category }}
+                            <span class="badge bg-primary rounded-pill">{{ count }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4>Recent Reviews</h4>
+            </div>
+            <div class="card-body">
+                {% for activity in recent_activities %}
+                <div class="review-card">
+                    <h5>{{ activity.name }}</h5>
+                    <div class="d-flex justify-content-between mb-2">
+                        <div class="star-rating">
+                            {% for i in range(5) %}
+                                {% if i < activity.stars|int %}
+                                    <i class="bi bi-star-fill"></i>★
+                                {% elif i < activity.stars and i >= activity.stars|int %}
+                                    <i class="bi bi-star-half"></i>★
+                                {% else %}
+                                    <i class="bi bi-star"></i>☆
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                        <div class="text-muted">{{ activity.date }}</div>
+                    </div>
+                    <p class="text-muted">{{ activity.city }}</p>
+                    <p>{{ activity.text[:200] + '...' if activity.text|length > 200 else activity.text }}</p>
+                    <div>
+                        <a href="/business/{{ activity.business_id }}" class="btn btn-sm btn-outline-primary">View Business</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
