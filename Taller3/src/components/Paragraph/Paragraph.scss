@@ -1,0 +1,21 @@
+@use "../../styles/mixins" as *;
+@use "../../styles/variables" as *;
+
+.paragraph {
+	@include font-regular;
+	font-size: $font-size-16;
+
+	a {
+		color: $primary-color;
+		text-decoration: underline;
+		transition: opacity,  300ms ease-in-out;
+
+		&:hover {
+			opacity: 0.6;
+		}
+	}
+
+	&.text-center {
+		text-align: center;
+	}
+}

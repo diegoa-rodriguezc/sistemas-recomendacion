@@ -1,0 +1,135 @@
+@use "../../styles/variables" as *;
+@use "../../styles/mixins" as *;
+
+.home-view:has(.movie-rating-container) {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 100vh;
+	background-color: rgba($background-color, 0.5);
+}
+
+.movie-rating-container {
+	width: 50vw;
+	max-width: 600px;
+	padding: $space-14 $space-12;
+	background-color: $white-color;
+	box-shadow: $box-shadow-1;
+
+	.main-heading {
+		text-align: center;
+		font-size: $font-size-32;
+	}
+
+	.paragraph {
+		text-align: center;
+		margin-top: $space-2;
+		@include font-medium;
+	}
+
+	.rating-progress .paragraph {
+		margin-top: $space-4;
+		@include font-bold-italic;
+	}
+
+	.movie-card {
+		.heading {
+			margin-top: $space-4;
+			@include font-bold;
+			text-align: center;
+			text-transform: uppercase;
+			color: $primary-color;
+		}
+
+		.movie-details {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			margin-top: $space-4;
+
+			img {
+				max-width: 200px;
+				margin: auto;
+			}
+
+			.movie-info .paragraph {
+				margin-top: $space-4;
+				@include font-light;
+			}
+		}
+	}
+
+	.rating-buttons {
+		margin-top: $space-8;
+
+		.stars {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			margin-top: $space-4;
+			gap: $space-4;
+
+			.rating-btn {
+				padding: $space-4;
+				width: fit-content;
+				border-radius: $space-4;
+				background-color: transparent;
+				border: 2px solid $text-color;
+				color: $text-color;
+				cursor: pointer;
+				transition: border 300ms ease-in-out, background-color 300ms ease-in-out, color 300ms ease-in-out;
+
+				&:hover {
+					border: 2px solid $primary-color;
+					background-color: $primary-color;
+					color: $white-color;
+				}
+			}
+		}
+	}
+}
+
+.genre-selection {
+	display: flex;
+	flex-wrap: wrap;
+	gap: $space-2;
+	margin-top: $space-6;
+	justify-content: center;
+
+	.genre-btn {
+		padding: $space-2 $space-4;
+		width: fit-content;
+		border-radius: $space-7;
+
+		&.selected, &:hover {
+			background: $primary-color;
+		}
+	}
+}
+
+.genre-count {
+	margin: 15px 0;
+	text-align: center;
+}
+
+.genre-info {
+	font-size: 1.1rem;
+	text-align: center;
+	margin-bottom: 15px;
+
+	strong {
+		color: #e50914;
+	}
+}
+
+.submit-btn {
+	width: 100%;
+	max-width: 300px;
+	margin: 20px auto;
+	display: block;
+
+	&:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+}

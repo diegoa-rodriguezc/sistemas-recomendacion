@@ -1,0 +1,14 @@
+@use "variables" as *;
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
+* {
+	font-family: $font-family;
+	margin: 0;
+	padding: 0;
+	box-sizing: border-box;
+	color: $text-color;
+}
+
+body {
+	font-size: $font-size-16;
+}

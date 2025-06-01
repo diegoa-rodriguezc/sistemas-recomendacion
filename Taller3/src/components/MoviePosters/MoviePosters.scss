@@ -1,0 +1,583 @@
+@use '../../styles/variables' as *;
+@use "../../styles/mixins" as *;
+
+$arrows-space: 25px;
+
+.movie-posters {
+	padding: 75px 0 0;
+	position: relative;
+	min-height: 100vh;
+
+	// Overlay para mejorar contraste sobre el fondo dinámico
+	&::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		bottom: 0;
+		background: rgba(0, 0, 0, 0.3);
+		z-index: 0;
+		transition: background 0.5s ease;
+	}
+
+	// Backdrop con overlay adicional
+	.movie-backdrop {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		z-index: -2;
+		opacity: 0.4;
+		filter: blur(2px);
+		transition: opacity 0.5s ease;
+
+		img {
+			width: 100%;
+			height: 100%;
+			object-fit: cover;
+		}
+	}
+
+	// Todos los elementos de contenido deben estar por encima del overlay
+	> * {
+		position: relative;
+		z-index: 1;
+	}
+
+	.main-heading {
+		text-transform: uppercase;
+		padding: $space-6 0 $space-10;
+		@include font-extrabold;
+		color: $white-color;
+		text-shadow: 2px 2px 6px rgba($text-color, .8);
+	}
+
+	.movies-slider {
+		width: 100%;
+		max-width: 1200px;
+		margin: 0 auto;
+		padding: 0 $space-10; // Añadir padding horizontal consistente
+		position: relative;
+		z-index: 2;
+
+		.slick-slider {
+			max-width: 100%; // Cambiar de 60% a 100%
+			margin: 0 auto; // Centrar en lugar de margin-left: auto
+			width: 100%; // Asegurar que ocupe todo el ancho disponible
+		}
+
+		.slick-list {
+			margin: 0 -#{$space-1}; // Compensar el padding de las slides
+		}
+
+		.slick-arrow {
+			z-index: 99;
+			background: rgba(0, 0, 0, 0.7) !important;
+			border-radius: 50%;
+			width: 50px !important;
+			height: 50px !important;
+			backdrop-filter: blur(10px);
+			border: 2px solid rgba(255, 255, 255, 0.3);
+			transition: all 0.3s ease;
+
+			&:hover {
+				background: rgba(0, 0, 0, 0.9) !important;
+				border-color: rgba(255, 255, 255, 0.6);
+				transform: scale(1.1);
+			}
+
+			&:before {
+				opacity: 1;
+				color: #ffffff;
+				font-size: $font-size-32;
+				text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+			}
+		}
+
+		.slick-prev {
+			left: -#{$arrows-space + 10px}; // Posicionar fuera del contenedor
+		}
+
+		.slick-next {
+			right: -#{$arrows-space + 10px}; // Posicionar fuera del contenedor
+		}
+
+		.slick-dots {
+			bottom: -50px;
+			
+			li {
+				margin: 0 3px;
+				
+				button {
+					background: rgba(0, 0, 0, 0.6);
+					border-radius: 50%;
+					backdrop-filter: blur(5px);
+					border: 1px solid rgba(255, 255, 255, 0.2);
+				}
+				
+				button:before {
+					font-size: 12px;
+					opacity: 0.7;
+					color: #ffffff;
+					text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+				}
+				
+				&.slick-active button:before {
+					opacity: 1;
+					color: #ffffff;
+				}
+			}
+		}
+
+		.slick-track {
+			display: flex !important;
+
+			.slick-slide {
+				height: inherit !important;
+				display: flex !important;
+				padding: 0 $space-1;
+
+				& > div {
+					width: 100%;
+					display: flex !important;
+				}
+			}
+		}
+	}
+
+	.movie-card {
+		height: 100%;
+		display: flex;
+		flex-direction: column;
+		position: relative;
+
+		img { 
+			width: 100%;
+			border-radius: 8px;
+			box-shadow: 
+				0 4px 12px rgba(0, 0, 0, 0.3),
+				0 8px 24px rgba(0, 0, 0, 0.2);
+			transition: transform 0.3s ease, box-shadow 0.3s ease;
+		}
+
+		&:hover img {
+			transform: translateY(-5px);
+			box-shadow: 
+				0 8px 20px rgba(0, 0, 0, 0.4),
+				0 12px 32px rgba(0, 0, 0, 0.3);
+		}
+
+		.poster, .no-poster {
+			height: 100%;
+			display: flex;
+			flex-direction: column;
+			position: relative;
+		}
+
+		.movie-number {
+			position: absolute;
+			top: 10px;
+			left: 10px;
+			background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(0, 0, 0, 0.7));
+			color: #ffffff;
+			border-radius: 50%;
+			width: 35px;
+			height: 35px;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-weight: bold;
+			font-size: 16px;
+			z-index: 3;
+			backdrop-filter: blur(5px);
+			border: 2px solid rgba(255, 255, 255, 0.3);
+			text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+			transition: all 0.3s ease;
+
+			&:hover {
+				transform: scale(1.1);
+				background: linear-gradient(135deg, rgba(0, 0, 0, 1), rgba(0, 0, 0, 0.8));
+			}
+		}
+	}
+
+	.no-poster {
+		background: linear-gradient(135deg, #e74c3c, #c0392b);
+		border-radius: 8px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		padding: $space-4;
+		box-shadow: 
+			0 4px 12px rgba(0, 0, 0, 0.3),
+			0 8px 24px rgba(0, 0, 0, 0.2);
+
+		.heading {
+			text-align: center;
+			@include font-bold;
+			color: #ffffff;
+			font-size: $font-size-18;
+			text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+		}
+
+		.movie-number {
+			background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.8));
+			color: #333333;
+		}
+	}
+
+	// Detalles de la película con mejor contraste
+	.movie-details {
+		display: flex;
+		flex-direction: column;
+		gap: $space-4;
+		padding: $space-8 $space-10;
+		margin: $space-6 auto 0; // Centrar y mantener margen superior
+		min-height: 400px;
+		width: 100%;
+		max-width: 1200px; // Mismo max-width que movies-slider
+		background: linear-gradient(
+			135deg,
+			rgba(0, 0, 0, 0.8),
+			rgba(0, 0, 0, 0.6)
+		);
+		backdrop-filter: blur(15px);
+		border-radius: 16px;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		box-shadow: 
+			0 8px 32px rgba(0, 0, 0, 0.3),
+			inset 0 1px 0 rgba(255, 255, 255, 0.1);
+
+		// Título principal
+		.movie-title {
+			@include font-bold;
+			color: #ffffff;
+			text-shadow: 
+				0 2px 4px rgba(0, 0, 0, 0.8),
+				0 4px 8px rgba(0, 0, 0, 0.4);
+			font-size: clamp(24px, 3vw, 36px);
+			margin-bottom: $space-2;
+			line-height: 1.2;
+
+			.movie-year {
+				opacity: 0.9;
+				font-weight: normal;
+				color: rgba(255, 255, 255, 0.9);
+				text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+			}
+		}
+
+		// Tagline
+		.movie-tagline {
+			font-style: italic;
+			color: rgba(255, 255, 255, 0.9);
+			font-size: $font-size-18;
+			text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+			margin-bottom: $space-3;
+		}
+
+		// Metadatos de la película
+		.movie-metadata {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+			gap: $space-3;
+			margin-bottom: $space-4;
+
+			> div {
+				display: flex;
+				flex-direction: column;
+				gap: $space-1;
+			}
+
+			.label {
+				font-weight: 600;
+				color: rgba(255, 255, 255, 0.8);
+				font-size: $font-size-14;
+				text-transform: uppercase;
+				letter-spacing: 1px;
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+			}
+
+			span:not(.label) {
+				color: #ffffff;
+				font-size: $font-size-16;
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+			}
+		}
+
+		// Información de reparto y crew
+		.crew-info,
+		.cast-info,
+		.production-info {
+			margin-bottom: $space-3;
+
+			.label {
+				@include font-semibold;
+				color: rgba(255, 255, 255, 0.8);
+				font-size: $font-size-16;
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+			}
+
+			span:not(.label) {
+				color: #ffffff;
+				font-size: $font-size-16;
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+			}
+		}
+
+		// Información financiera
+		.financial-info {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: $space-4;
+			margin-bottom: $space-4;
+
+			.label {
+				@include font-semibold;
+				color: rgba(255, 255, 255, 0.8);
+				font-size: $font-size-14;
+				text-transform: uppercase;
+				letter-spacing: 1px;
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+			}
+
+			span:not(.label) {
+				color: #ffffff;
+				font-size: $font-size-16;
+				@include font-medium;
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+			}
+		}
+
+		// Sinopsis
+		.movie-overview {
+			@include font-light;
+			color: rgba(255, 255, 255, 0.95);
+			text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+			font-size: $font-size-18;
+			line-height: 1.6;
+			margin-bottom: $space-4;
+		}
+
+		// Calificaciones mejoradas
+		.movie-rating {
+			display: flex;
+			flex-wrap: wrap;
+			gap: $space-4;
+			margin-top: $space-4;
+
+			p {
+				display: flex;
+				align-items: center;
+				color: #ffffff;
+				@include font-medium;
+				font-size: $font-size-16;
+				gap: $space-2;
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+			}
+
+			.rating-value {
+				font-size: $font-size-18;
+				font-weight: bold;
+				color: #ffffff;
+				background: linear-gradient(135deg, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.6));
+				border-radius: 8px;
+				padding: 8px 12px;
+				min-width: 50px;
+				text-align: center;
+				text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+				backdrop-filter: blur(5px);
+				border: 1px solid rgba(255, 255, 255, 0.2);
+				transition: all 0.3s ease;
+
+				&.tmdb {
+					border-color: #f39c12;
+					box-shadow: 0 0 10px rgba(243, 156, 18, 0.3);
+
+					&:hover {
+						box-shadow: 0 0 15px rgba(243, 156, 18, 0.5);
+					}
+				}
+
+				&.predicted {
+					border-color: #9b59b6;
+					box-shadow: 0 0 10px rgba(155, 89, 182, 0.3);
+
+					&:hover {
+						box-shadow: 0 0 15px rgba(155, 89, 182, 0.5);
+					}
+				}
+			}
+
+			.vote-count {
+				opacity: 0.9;
+				font-size: $font-size-14;
+				color: rgba(255, 255, 255, 0.9);
+				text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+				font-weight: 500;
+			}
+		}
+	}
+}
+
+// Loading container mejorado
+.loading-container {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	min-height: 400px;
+	background: linear-gradient(
+		135deg,
+		rgba(0, 0, 0, 0.8),
+		rgba(0, 0, 0, 0.6)
+	);
+	backdrop-filter: blur(15px);
+	border-radius: 16px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	margin: $space-6 auto 0; // Centrar como movie-details
+	max-width: 1200px; // Mismo max-width
+	width: 100%;
+
+	p {
+		font-size: $font-size-20;
+		color: #ffffff;
+		text-align: center;
+		text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+		@include font-medium;
+	}
+}
+
+// Responsive Design
+@media (max-width: 1400px) {
+	.movie-posters {
+		.movies-slider {
+			padding: 0 $space-8; // Reducir padding en pantallas más pequeñas
+			
+			.slick-arrow {
+				&.slick-prev {
+					left: -30px;
+				}
+				
+				&.slick-next {
+					right: -30px;
+				}
+			}
+		}
+
+		.movie-details {
+			padding: $space-6 $space-8;
+		}
+	}
+}
+
+@media (max-width: 1024px) {
+	.movie-posters {
+		.main-heading {
+			padding: 15px 30px;
+			font-size: clamp(20px, 5vw, 32px);
+		}
+
+		.movies-slider {
+			padding: 0 $space-6;
+		}
+
+		.movie-details {
+			padding: $space-6;
+			
+			.movie-metadata {
+				grid-template-columns: 1fr;
+			}
+
+			.financial-info {
+				grid-template-columns: 1fr;
+			}
+		}
+	}
+}
+
+@media (max-width: 768px) {
+	.movie-posters {
+		padding: 50px 0 0;
+
+		.main-heading {
+			padding: 12px 20px;
+			margin-bottom: 20px;
+		}
+
+		.movies-slider {
+			padding: 0 $space-4;
+			
+			.slick-arrow {
+				width: 40px !important;
+				height: 40px !important;
+
+				&.slick-prev {
+					left: -20px;
+				}
+				
+				&.slick-next {
+					right: -20px;
+				}
+				
+				&:before {
+					font-size: 20px;
+				}
+			}
+		}
+		
+		.movie-card {
+			.movie-number {
+				width: 30px;
+				height: 30px;
+				font-size: 14px;
+			}
+		}
+
+		.movie-details {
+			padding: $space-4;
+			margin: $space-4 $space-2 0;
+
+			.movie-title {
+				font-size: clamp(20px, 4vw, 28px);
+			}
+
+			.movie-overview {
+				font-size: $font-size-16;
+			}
+		}
+
+		.loading-container {
+			margin: $space-4 $space-2 0;
+		}
+	}
+}
+
+@media (max-width: 480px) {
+	.movie-posters {
+		.main-heading {
+			padding: 10px 15px;
+			font-size: clamp(16px, 6vw, 24px);
+			letter-spacing: 1px;
+		}
+
+		.movies-slider {
+			padding: 0 $space-2;
+		}
+
+		.movie-details {
+			.movie-rating {
+				flex-direction: column;
+				gap: $space-2;
+
+				.rating-value {
+					font-size: $font-size-16;
+					padding: 6px 10px;
+				}
+			}
+		}
+	}
+}

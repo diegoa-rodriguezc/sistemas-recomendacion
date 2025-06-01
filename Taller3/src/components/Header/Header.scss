@@ -1,0 +1,56 @@
+@use "../../styles/variables" as *;
+@use "../../styles/mixins" as *;
+
+.app-header {
+	position: absolute;
+	z-index: 1;
+	width: 100%;
+	padding: $space-4 $space-8;
+}
+
+.header-content {
+	display: flex;
+	flex-direction: row;
+	justify-content: space-between;
+	align-items: center;
+	max-width: 1200px;
+	margin: auto;
+
+	.header-actions {
+		display: flex;
+		gap: $space-8;
+		align-items: center;
+	}
+
+	.heading,
+	.paragraph {
+		color: $background-color;
+		text-shadow: 1px 1px 5px rgba($text-color, .5);
+	}
+
+	.rate-movies-button {
+		padding: $space-1 $space-3;
+		background-color: transparent;
+		@include font-semibold;
+		text-shadow: 1px 1px 5px rgba($text-color, .5);
+	}
+
+	.logout-button {
+		min-width: 180px;
+		padding: $space-2 $space-3;
+		background-color: transparent;
+		color: $background-color;
+		border: 2px solid $background-color;
+		box-sizing: border-box;
+
+		&:hover {
+			background-color: $text-color;
+			color: $background-color;
+			border: 2px solid $text-color;
+		}
+	}
+
+	.welcome-section {
+		height: fit-content;
+	}
+}

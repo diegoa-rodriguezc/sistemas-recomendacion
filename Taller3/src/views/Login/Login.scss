@@ -1,0 +1,71 @@
+@use "../../styles/mixins" as *;
+@use "../../styles/variables" as *;
+
+.login-view {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	height: 100vh;
+	background-color: rgba($background-color, 0.5);
+
+	.login-container {
+		padding: $space-14 $space-12;
+		background-color: $white-color;
+		box-shadow: $box-shadow-1;
+
+		.heading-context {
+			margin-top: $space-2;
+			@include font-medium;
+		}
+
+		.error {
+			text-align: center;
+			margin: $space-3 auto 0;
+			color: $error-color;
+			@include font-bold;
+			max-width: 400px;
+		}
+
+		form {
+			width: 400px;
+			margin-top: $space-10;
+		}
+
+		.toggle-form {
+			margin-top: $space-10;
+		}
+
+		.toggle-link {
+			color: $primary-color;
+			text-decoration: underline;
+			@include font-medium;
+			cursor: pointer;
+			transition: opacity,  300ms ease-in-out;
+
+			&:hover {
+				opacity: 0.6;
+			}
+		}
+	}
+
+	.login-tabs {
+		display: flex;
+		margin: $space-4 0 $space-8;
+		gap: $space-4;
+
+		.tab-button {
+			flex: 1;
+			padding: $space-2;
+			border: 1px solid $text-color;
+			background-color: $white-color;
+			color: $text-color;
+			cursor: pointer;
+
+			&.active, &:hover {
+				color: $white-color;
+				background-color: $text-color;
+				border-color: $text-color;
+			}
+		}
+	}
+}
